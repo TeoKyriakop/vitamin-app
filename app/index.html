@@ -252,7 +252,7 @@ footer p{margin:0}
     if(memo.has(key)) return memo.get(key);
     const row = INDEX.find(r => r[0]===t && r[1]===id); if(!row) return null;
     let d = await cacheGet(key, row[5]);
-    if(!d){ const r = await fetch(`data/e/${t}/${encodeURIComponent(id)}.json`); if(!r.ok) return null; d = await r.json(); cachePut(key, row[5], d); }
+    if(!d){ const r = await fetch(`data/e/${t}/${encodeURIComponent(id)}.json?v=${row[5]}`); if(!r.ok) return null; d = await r.json(); cachePut(key, row[5], d); }
     memo.set(key, d); return d;
   }
 
@@ -555,7 +555,13 @@ footer p{margin:0}
       const best = cands.map(c => [c, similar(c, t)]).sort((a,b) => b[1]-a[1])[0];
       if(best && best[1] >= 0.6) return {en: best[0], via: "", guess:true};
     }catch{}
-    return {en:"", via:"", guess:false};
+    try{   // PubMed's own spelling correction (e.g. lubrokinase -> lumbrokinase)
+      const c = new AbortController(); setTimeout(() => c.abort(), 8000);
+      const xml = await (await fetch("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/espell.fcgi?" + new URLSearchParams({db:"pubmed", term:t, tool:"vitamin-compass"}), {signal:c.signal})).text();
+      const fixed = (/<CorrectedQuery>([^<]*)<\/CorrectedQuery>/.exec(xml)?.[1] || "").trim();
+      if(fixed && similar(fixed, t) >= 0.6) return {en: fixed, via: "", guess:true};
+    }catch{}
+    return t.length >= 3 ? {en: t, via: "", guess:true} : {en:"", via:"", guess:false};   // search with the transliteration
   }
   const STUDY = '(meta-analysis[pt] OR systematic review[pt] OR randomized controlled trial[pt] OR clinical trial[pt]) NOT (animals[mh] NOT humans[mh])';
   const OTHER = "NOT (animals[mh] NOT humans[mh]) NOT (comment[pt] OR editorial[pt] OR letter[pt]) NOT (meta-analysis[pt] OR systematic review[pt] OR randomized controlled trial[pt] OR clinical trial[pt])";
@@ -788,6 +794,8 @@ footer p{margin:0}
     $("#stClear").textContent = "Διαγράφηκαν"; showUsage();
   };
   if(navigator.storage?.persist) navigator.storage.persist().catch(()=>{});
+  const STORE_VERSION = "2";   // raise to discard entries saved by an older version of the app
+  try{ if(localStorage.getItem("vc:storeVersion") !== STORE_VERSION){ tx("entries","readwrite",st=>st.clear()).then(() => { try{ localStorage.setItem("vc:storeVersion", STORE_VERSION); }catch{} }); } }catch{}
 
   (async () => {
     try{ await loadIndex(); }
