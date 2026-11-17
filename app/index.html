@@ -111,6 +111,11 @@ ol.rank li > div{min-width:0}
 .shop a{font-size:.82rem;text-decoration:none;border:1px solid var(--line);padding:4px 10px;border-radius:999px;color:var(--ink)}
 .shop a:hover{border-color:var(--berry)}
 
+.alert{background:var(--berry-soft);color:var(--ink);border-left:4px solid var(--berry);border-radius:12px;padding:10px 14px;font-size:.92rem}
+.alert b{color:var(--berry)}
+.alert.big{margin-top:12px;font-size:.98rem;padding:12px 16px}
+.tag.doc{background:var(--berry-soft);color:var(--berry)}
+.pos.no{background:var(--berry-soft);color:var(--berry);border-color:transparent}
 .ai-box{background:var(--indigo-soft);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
 .ai-box .btn{--c:var(--indigo)}
 .ai-box input{padding:9px 12px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);min-width:0;width:100%;max-width:340px}
@@ -213,18 +218,26 @@ footer p{margin:0}
 
   /* ---------- search ---------- */
   const allRows = () => [...INDEX, ...[...extra.values()].map(e => [e.t, e.id, e.n, e.cat||"", norm([e.n,e.en,...(e.k||[])].join(" ")), "ai"])];
+  const STOP = new Set(["θελω","να","εχω","για","την","τον","του","της","των","πιο","μου","με","και","σε","στο","στη","στην","απο","καλυτερο","καλυτερη","καλυτερα","βελτιωση","προβλημα","the","and","for","with"]);
+  const stem = w => w.slice(0, Math.max(4, w.length - 2));
   function score(q, row){
-    const nq = norm(q); if(!nq) return 0;
-    const nn = norm(row[2]), kw = row[4];
-    if(nn === nq) return 100;
-    if(nn.startsWith(nq) || (` ${kw} `).includes(` ${nq} `)) return 80;
-    if(nn.includes(nq) || kw.includes(nq)) return 60;
-    const words = nq.split(" ").filter(w => w.length > 2 && !["θελω","να","εχω","για","την","τον","του","της","πιο","μου","καλυτερο","καλυτερη"].includes(w));
-    const hit = words.filter(w => kw.includes(w.slice(0, Math.max(4, w.length-2))));
-    return words.length && hit.length ? 30 + 20*hit.length/words.length : 0;
+    // full = every meaningful word of the query is found; partial matches never open an entry by themselves
+    const nq = norm(q); if(!nq) return {s:0, full:false};
+    const nn = norm(row[2]), kw = " " + row[4] + " ";
+    if(nn === nq) return {s:100, full:true};
+    if(kw.includes(" " + nq + " ")) return {s:90, full:true};
+    if(nn.startsWith(nq + " ") || nn.startsWith(nq)) return {s:80, full:true};
+    const words = nq.split(" ").filter(w => w.length > 2 && !STOP.has(w));
+    if(!words.length) return {s:0, full:false};
+    const hit = words.filter(w => kw.includes(stem(w)) || nn.includes(stem(w)));
+    const full = hit.length === words.length;
+    return {s: full ? 60 + Math.min(20, 3*words.length) : 25 * hit.length / words.length, full};
   }
-  function find(q, types){
-    return allRows().filter(r => types.includes(r[0])).map(r => [r, score(q, r) + (r[0]==="g"?2:0)]).filter(x => x[1] >= 40).sort((a,b)=>b[1]-a[1])[0]?.[0];
+  function search(q, types){
+    const ranked = allRows().filter(r => types.includes(r[0])).map(r => ({r, ...score(q, r)})).filter(x => x.s > 0)
+      .sort((a,b) => b.s - a.s || (a.r[0]==="g"?-1:1));
+    const full = ranked.filter(x => x.full);
+    return {full, partial: ranked.filter(x => !x.full).slice(0, 4)};
   }
 
   /* ---------- rendering helpers ---------- */
@@ -279,6 +292,7 @@ footer p{margin:0}
 
   function head(e){
     const tags = [`<span class="tag">${esc(TYPE_LABEL[e.t])}</span>`];
+    if(e.doctor) tags.push(`<span class="tag doc">Μόνο με γιατρό</span>`);
     if(e.src === "ai") tags.push(`<span class="tag ai">Εμπλουτισμός Claude · ${esc(e.date||"")}</span>`);
     if(e.auto?.upd) tags.push(`<span class="tag auto">Αυτόματη ενημέρωση · ${esc(e.auto.upd)}</span>`);
     return `<div class="result-head"><div><div class="eyebrow">${esc(e.cat||TYPE_LABEL[e.t])}</div><h2>${esc(e.n)}</h2>${e.sum?`<p class="sub">${esc(e.sum)}</p>`:""}</div><div class="tags">${tags.join("")}</div></div>`;
@@ -323,22 +337,34 @@ footer p{margin:0}
   function viewSymptom(e){
     const ref = e.ref || {}, nm = id => ref[id]?.n || id;
     const ev = byGrade(e.v||[]).filter(x => ref[x[0]] || extra.has("i/"+x[0]));
-    let p1 = sec("Από μελέτες") + rankList(ev.map(([id,g,why]) => graded(g, link("i", id, nm(id)), why)));
+    let p1 = "";
+    if(e.avoid?.length) p1 += sec("Να αποφεύγονται") + `<ol class="rank avoid">${e.avoid.map(([what,why,id]) => `<li><span class="pos no">✕</span><div><span class="r-t">${id ? link("i", id, what) : esc(what)}</span><div class="r-n">${esc(why)}</div></div></li>`).join("")}</ol>`;
+    p1 += sec(e.doctor ? "Μπορεί να βοηθήσουν, μόνο με οδηγία γιατρού" : "Από μελέτες") + rankList(ev.map(([id,g,why]) => graded(g, link("i", id, nm(id)), why)), "Δεν υπάρχει συμπλήρωμα που να συνιστάται γενικά. Ακολουθήστε τον γιατρό σας.");
     p1 += autoLit(e.auto);
     p1 += sec("Από εμπειρίες χρηστών (φόρουμ)") + rankList((e.u||[]).map(([id,txt]) => `${link("i", id, nm(id))}<div class="r-n">${esc(txt)}</div>`), "Δεν υπάρχουν ακόμη αναφορές.") + autoForum(e.auto);
+    if(e.diff?.length) p1 += sec("Μην το συγχέετε με") + rankList(e.diff.map(([id,n,why]) => `${link("s", id, n)}<div class="r-n">${esc(why)}</div>`));
     p1 += `<div class="legend"><a href="${reddit(enName(e)+" supplement helped")}" target="_blank" rel="noopener">Εμπειρίες στο Reddit</a></div>`;
     const st = e.st || [];
     const p2 = (st.map(s => studyCard(s, e.src==="ai")).join("") || `<p class="r-n">Δεν υπάρχουν ακόμη επιλεγμένες μελέτες.</p>`) + autoStudies(e.auto) +
       `<div class="legend"><a href="${pubmed(enName(e)+" supplementation randomized")}" target="_blank" rel="noopener">Περισσότερα στο PubMed</a><a href="${scholar(enName(e)+" vitamin supplementation trial")}" target="_blank" rel="noopener">Google Scholar</a></div>`;
     const ids = [...new Set([...ev.map(x=>x[0]), ...(e.u||[]).map(x=>x[0])])].slice(0,4);
     let p3 = "";
+    if(e.doctor){
+      p3 += sec("Να συζητήσετε με τον γιατρό σας") + rankList([
+        ...ev.map(([id,,why]) => `${link("i", id, nm(id))}<div class="r-n">${esc(why)}</div>`),
+        `<span class="r-t">Ποιες εξετάσεις χρειάζομαι και κάθε πότε;</span>`,
+        `<span class="r-t">Αλληλεπιδρούν τα συμπληρώματα με τα φάρμακά μου;</span>`]);
+    } else {
     const foodRows = ids.map(id => ref[id]?.fd0 ? [`${nm(id)}: ${ref[id].fd0[0]}`, ref[id].fd0[1], ref[id].fd0[2]] : null).filter(Boolean);
     if(foodRows.length) p3 += sec("Πρώτα από τη διατροφή") + forms(foodRows, "food");
     const formRows = ids.map(id => ref[id]?.f0 ? [`${nm(id)}: ${ref[id].f0[0]}`, ref[id].f0[1], ref[id].f0[2]] : null).filter(Boolean);
     if(formRows.length) p3 += sec("Συμπληρώματα") + forms(formRows);
+    }
+    if(e.lifex?.length) p3 += sec("Καθημερινές συνήθειες") + rankList(e.lifex.map(([what,why,g]) => graded(g, `<span class="r-t">${esc(what)}</span>`, why)));
     if(e.life?.length) p3 += sec("Τρόπος ζωής & τροφές") + rankList(e.life.map(([t,id,n,g,why]) => graded(g, `<span class="kind k-${t}">${KIND[t]}</span>${link(t,id,n)}`, why))) + (e.goalref?`<div class="legend"><a href="#g-${esc(e.goalref[0])}">Όλα για «${esc(e.goalref[1])}» ›</a></div>`:"");
-    p3 += `<div class="warn"><b>Προσοχή:</b> Αν το σύμπτωμα επιμένει, κάντε πρώτα εξετάσεις. Πολλά οφέλη ισχύουν μόνο όταν υπάρχει έλλειψη.</div>`;
+    p3 += `<div class="warn"><b>Προσοχή:</b> ${e.doctor ? "Πάθηση που χρειάζεται ιατρική παρακολούθηση. Κάθε συμπλήρωμα μόνο με έγκριση του θεράποντα γιατρού." : "Αν το σύμπτωμα επιμένει, κάντε πρώτα εξετάσεις. Πολλά οφέλη ισχύουν μόνο όταν υπάρχει έλλειψη."}</div>`;
     return head(Object.assign({sum:"Βιταμίνες, τροφές και συνήθειες που μπορεί να βοηθήσουν, με σειρά τεκμηρίωσης. Πατήστε ένα όνομα για λεπτομέρειες."}, e)) +
+      (e.alert ? `<div class="alert big" role="note"><b>${e.doctor ? "Ιατρική πάθηση" : "Σημαντικό"}:</b> ${esc(e.alert)}</div>` : "") +
       `<div class="panes">${pane(1,"Τι μπορεί να βοηθήσει",`${ev.length+(e.u||[]).length} σημεία`,p1)}${pane(2,"Επίσημες μελέτες",`${st.length+(e.auto?.ps?.length||0)} μελέτες`,p2)}${pane(3,"Διατροφή, συμπληρώματα & ζωή","",p3)}</div>`;
   }
 
@@ -373,12 +399,17 @@ footer p{margin:0}
   const go = (t, id) => { const h = `#${t}-${id}`; if(location.hash === h) route(true); else location.hash = h; };
 
   /* ---------- not found: server discovery or Claude enrichment ---------- */
-  function viewMissing(types, q){
+  function viewChoose(q, rows){
+    $("#result").innerHTML = `<div class="result-head"><div><div class="eyebrow">Διευκρίνιση</div><h2>Ποιο από αυτά εννοείτε;</h2><p class="sub">Ο όρος «${esc(q)}» ταιριάζει σε διαφορετικές καταστάσεις με διαφορετικές οδηγίες.</p></div></div>
+      <div class="panes" style="grid-template-columns:1fr"><article class="pane"><div class="pane-b">${rankList(rows.map(r => `${link(r[0], r[1], r[2])}<div class="r-n">${esc(TYPE_LABEL[r[0]])}</div>`))}</div></article></div>`;
+  }
+  function viewMissing(types, q, partial){
     const kind = types[0] === "g" ? "h" : types[0];
     const latin = /[a-z]/i.test(q) ? q : "";
     const canServer = MODE === "server", canAI = !!sample;
     $("#result").innerHTML = `<div class="result-head"><div><div class="eyebrow">Νέα αναζήτηση</div><h2>«${esc(q)}»</h2><p class="sub">Δεν υπάρχει ακόμη στη βάση.</p></div></div>
       <div class="panes" style="grid-template-columns:1fr"><article class="pane"><div class="pane-b">
+        ${partial?.length ? `<div class="alert"><b>Δεν βρέθηκε ακριβώς «${esc(q)}».</b> Τα παρακάτω μοιάζουν, αλλά μπορεί να είναι <b>διαφορετική κατάσταση με διαφορετικές οδηγίες</b>. Ανοίξτε τα μόνο αν είστε σίγουροι ότι σας αφορούν.</div>` + rankList(partial.map(r => `${link(r[0], r[1], r[2])}<div class="r-n">${esc(TYPE_LABEL[r[0]])}</div>`)) : ""}
         ${canServer ? `<div class="ai-box"><b>Αυτόματη άντληση από PubMed, Europe PMC και σχόλια χρηστών</b>
           <span>Ο server αναζητά μελέτες και εμπειρίες, μετρά πόσο επαναλαμβάνεται κάθε αποτέλεσμα και προσθέτει την καταχώριση στη βάση για όλους.</span>
           <label for="enTerm" class="r-n">Ο όρος στα αγγλικά (για PubMed)</label><input id="enTerm" value="${esc(latin)}" placeholder="π.χ. ashwagandha, intermittent fasting">
@@ -441,8 +472,17 @@ footer p{margin:0}
     ev.preventDefault();
     const q = f.querySelector("input").value.trim(); if(!q) return;
     const types = f.dataset.types.split(",");
-    const row = find(q, types);
-    if(row) go(row[0], row[1]); else { history.replaceState(null, "", location.pathname + location.search); viewMissing(types, q); $("#result").scrollIntoView({behavior:"smooth"}); }
+    const {full, partial} = search(q, types);
+    const top = full[0];
+    // several equally good matches (e.g. "θυρεοειδής"): let the person choose instead of guessing
+    const close = top ? full.filter(x => x.s >= top.s - 5 && x.s < 100) : [];
+    if(top && (top.s === 100 || close.length < 2)) return go(top.r[0], top.r[1]);
+    const goals = close.filter(x => x.r[0] === "g");   // lifestyle: a goal ("αντοχή") wins over the habits that serve it
+    if(goals.length === 1) return go(goals[0].r[0], goals[0].r[1]);
+    history.replaceState(null, "", location.pathname + location.search);
+    if(close.length >= 2) viewChoose(q, close.map(x => x.r));
+    else viewMissing(types, q, partial.map(x => x.r));
+    $("#result").scrollIntoView({behavior:"smooth"});
   }));
   window.addEventListener("hashchange", () => route(true));
 

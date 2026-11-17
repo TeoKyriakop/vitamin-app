@@ -116,12 +116,13 @@ def build_entry(t, id_, ents):
         e["foods"] = [[x, name("f", x)] for x in e.get("fl", []) if name("f", x)]
         e["syms"] = [[k[1], v["n"]] for k, v in ents.items() if k[0] == "s" and any(x[0] == id_ for x in v.get("v", []) + v.get("u", []))]
     elif t == "s":
-        ids = list(dict.fromkeys([x[0] for x in e.get("v", []) + e.get("u", [])]))
+        ids = list(dict.fromkeys([x[0] for x in e.get("v", []) + e.get("u", [])] + [a[2] for a in e.get("avoid", []) if a[2]]))
         e["ref"] = {x: {"n": name("i", x), "f0": (ents[("i", x)].get("f") or [None])[0], "fd0": (ents[("i", x)].get("fd") or [None])[0]} for x in ids if name("i", x)}
         allst = _studies_of([x[0] for x in e.get("v", [])], ents, "i")
         words = [w for w in {norm(x) for x in [e.get("en", "")] + e.get("k", [])} if len(w) > 3]
         rel = [s for s in allst if any(w[:max(4, len(w) - 2)] in norm(s[5] + " " + s[6]) for w in words)]
-        e["st"] = (rel or allst)[:14]
+        own = sorted([list(x) for x in e.get("s", [])], key=_rank_study)
+        e["st"] = (own + (rel or ([] if own else allst)))[:14]
         g = ents.get(("g", e.get("goal")))
         if g:
             e["life"] = [["h", x[0], name("h", x[0]), x[1], x[2]] for x in g.get("v", []) if name("h", x[0])][:5] + \
