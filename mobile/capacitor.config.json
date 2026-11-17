@@ -1,0 +1,7 @@
+{
+  "appId": "io.github.teokyriakop.vitamincompass",
+  "appName": "Πυξίδα Βιταμινών",
+  "webDir": "www",
+  "android": { "allowMixedContent": false },
+  "plugins": { "SplashScreen": { "launchShowDuration": 600, "backgroundColor": "#EEF5F1" } }
+}

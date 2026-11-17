@@ -192,6 +192,7 @@ footer p{margin:0}
 
   <footer>
     <p><b>Σημαντικό:</b> Οι πληροφορίες είναι ενημερωτικές και δεν αντικαθιστούν ιατρική συμβουλή. Πριν ξεκινήσετε συμπλήρωμα ή μεγάλη αλλαγή στη διατροφή ή την άσκηση, ειδικά με φάρμακα, εγκυμοσύνη ή χρόνια νόσο, συμβουλευτείτε γιατρό ή φαρμακοποιό.</p>
+    <p><a href="privacy.html" target="_blank" rel="noopener">Πολιτική απορρήτου</a></p>
     <p><b>Βαθμοί τεκμηρίωσης:</b> A = ισχυρή (μεγάλα RCT ή μετα-αναλύσεις), B = μέτρια, C = ασθενής, μικτή ή αρνητική. Οι εμπειρίες χρηστών είναι ανέκδοτες: δείχνουν τι επαναλαμβάνεται συχνά, όχι τι είναι αποδεδειγμένο.</p>
   </footer>
 </div>
@@ -212,6 +213,15 @@ footer p{margin:0}
   const extra = new Map();        // entries added by Claude (artifact mode), "t/id" -> entry
   let MODE = "static", db = null, sample = null;
   const REPO = (document.querySelector('meta[name="vc-repo"]')?.content || "").replace(/[^\w.\-\/]/g, "");
+  let WORKER = "", DATA_BASE = "";
+  const configReady = fetch("config.json", {cache:"no-cache"}).then(r => r.ok ? r.json() : {}).then(c => { WORKER = c.worker || ""; DATA_BASE = c.dataBase || ""; }).catch(() => {});
+  const NATIVE = !!window.Capacitor?.isNativePlatform?.();
+  // Remote copy first (always current); in the Android app, fall back to the copy bundled inside it when offline
+  async function fetchData(path, opts){
+    await configReady;
+    if(DATA_BASE){ try{ const r = await fetch(DATA_BASE + path, opts); if(r.ok) return r; }catch{} return fetch(path.split("?")[0]); }
+    return fetch(path, opts);
+  }
 
   /* ---------- on-device storage (IndexedDB), size chosen by the user ---------- */
   const CAP_KEY = "vc:capMB", CAPS = [25, 50, 100, 250, 500];
@@ -252,7 +262,7 @@ footer p{margin:0}
     if(memo.has(key)) return memo.get(key);
     const row = INDEX.find(r => r[0]===t && r[1]===id); if(!row) return null;
     let d = await cacheGet(key, row[5]);
-    if(!d){ const r = await fetch(`data/e/${t}/${encodeURIComponent(id)}.json?v=${row[5]}`); if(!r.ok) return null; d = await r.json(); cachePut(key, row[5], d); }
+    if(!d){ const r = await fetchData(`data/e/${t}/${encodeURIComponent(id)}.json?v=${row[5]}`); if(!r.ok) return null; d = await r.json(); cachePut(key, row[5], d); }
     memo.set(key, d); return d;
   }
 
@@ -638,8 +648,6 @@ footer p{margin:0}
     if(all.length) refreshLists();
   }
   const canLive = () => !window.claude && location.protocol.startsWith("http");
-  let WORKER = "";
-  const configReady = fetch("config.json", {cache:"no-cache"}).then(r => r.ok ? r.json() : {}).then(c => { WORKER = c.worker || ""; }).catch(() => {});
   async function shareLive(e, via){   // ask the Cloudflare Worker to add this term to the shared base for everyone
     await configReady; if(!WORKER || !canLive()) return null;
     try{
@@ -786,6 +794,11 @@ footer p{margin:0}
     $("#result").scrollIntoView({behavior:"smooth"});
   }));
   window.addEventListener("hashchange", () => route(true));
+  if(NATIVE) document.addEventListener("click", ev => {
+    const a = ev.target.closest('a[target="_blank"]'); if(!a) return;
+    ev.preventDefault(); const B = window.Capacitor?.Plugins?.Browser;
+    if(B) B.open({url: a.href}); else location.href = a.href;   // Capacitor opens other sites in the phone browser
+  });
 
   const CHIPS = {i:[["i","vitd"],["i","mg"],["i","omega3"],["i","b12"],["i","zn"]], s:[["s","insomnia"],["s","fatigue"],["s","anxiety"],["s","hair"],["s","cramps"]], l:[["g","endurance"],["h","quit-smoking"],["g","sleep-goal"],["f","fatty-fish"],["g","heart-goal"],["f","legumes"]], q:[["q","d-when"],["q","fe-everyone"],["q","sleep-best"],["q","natural-safe"],["q","exercise-howmuch"]]};
   function refreshLists(){
@@ -799,7 +812,7 @@ footer p{margin:0}
     $("#kbStat").textContent = `${c("i")} συμπληρώματα · ${c("s")} παθήσεις · ${c("h")+c("g")+c("f")} τρόπος ζωής & διατροφή · ${c("q")} ερωτήσεις`;
   }
   async function loadIndex(){
-    const r = await fetch("data/index.json", {cache:"no-cache"});
+    const r = await fetchData("data/index.json", {cache:"no-cache"});
     const j = await r.json(); INDEX = j.e; refreshLists(); return j;
   }
 
@@ -823,8 +836,8 @@ footer p{margin:0}
   (async () => {
     try{ await loadIndex(); }
     catch{ $("#result").innerHTML = `<p class="loading">Η βάση δεν φόρτωσε. Ελέγξτε τη σύνδεση και ανανεώστε.</p>`; return; }
-    try{ const h = await fetch("api/health", {cache:"no-store"}); if(h.ok && (await h.json()).mode === "server") MODE = "server"; }catch{}
-    if(canLive() && "serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js").catch(()=>{}); }
+    if(!DATA_BASE){ try{ const h = await fetch("api/health", {cache:"no-store"}); if(h.ok && (await h.json()).mode === "server") MODE = "server"; }catch{} }
+    if(canLive() && !NATIVE && "serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js").catch(()=>{}); }
     await loadLive();
     // Always open on an empty search page, even if the browser restores the last viewed entry (#...)
     if(location.hash) history.replaceState(null, "", location.pathname + location.search);
