@@ -1,0 +1,482 @@
+<title>Πυξίδα Βιταμινών</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Commissioner:wght@500;700;800&family=Noto+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: compact header, three search "capsules" (vitamin / problem / lifestyle & food), then three result windows side by side (stacked on phones). */
+:root{
+  --bg:#EEF5F1; --surface:#FFFFFF; --surface-2:#F6FAF8; --ink:#12332B; --muted:#56706A; --line:#D5E3DC;
+  --leaf:#1F9461; --leaf-soft:#DDF2E7; --sun:#B87B00; --sun-soft:#FCF0D2; --berry:#C2366B; --berry-soft:#F9E1EA;
+  --indigo:#3C55CF; --indigo-soft:#E3E8FB; --orange:#E2611A; --orange-soft:#FDE6D7; --teal:#0E8A8A; --teal-soft:#D8F1F0; --grey-soft:#E8ECEB;
+  --shadow:0 1px 2px rgba(18,51,43,.06),0 6px 20px rgba(18,51,43,.06);
+  --display:"Commissioner",system-ui,sans-serif; --body:"Noto Sans",system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0E1A17; --surface:#15241F; --surface-2:#1A2C27; --ink:#E5F1EC; --muted:#9BB3AB; --line:#2A3F38;
+  --leaf:#4CC48C; --leaf-soft:#173A2B; --sun:#F2B63A; --sun-soft:#3A2E12; --berry:#F06D9C; --berry-soft:#3D1A28;
+  --indigo:#8A9CF5; --indigo-soft:#1E2547; --orange:#FF9152; --orange-soft:#3D2414; --teal:#4FD1CF; --teal-soft:#123634; --grey-soft:#24332E;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.25); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E1A17; --surface:#15241F; --surface-2:#1A2C27; --ink:#E5F1EC; --muted:#9BB3AB; --line:#2A3F38;
+  --leaf:#4CC48C; --leaf-soft:#173A2B; --sun:#F2B63A; --sun-soft:#3A2E12; --berry:#F06D9C; --berry-soft:#3D1A28;
+  --indigo:#8A9CF5; --indigo-soft:#1E2547; --orange:#FF9152; --orange-soft:#3D2414; --teal:#4FD1CF; --teal-soft:#123634; --grey-soft:#24332E;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.25); color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
+.wrap{max-width:1260px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1,h2,h3{font-family:var(--display);margin:0;text-wrap:balance}
+a{color:var(--indigo)}
+button,input{font:inherit}
+:focus-visible{outline:3px solid var(--orange);outline-offset:2px}
+
+header.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.logo{width:46px;height:46px;flex:none}
+.brand{min-width:0;flex:1 1 300px}
+.brand h1{font-size:1.7rem;font-weight:800;letter-spacing:-.01em}
+.brand p{margin:0;color:var(--muted);font-size:.92rem}
+.kb-stat{font-size:.82rem;color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-variant-numeric:tabular-nums}
+
+.search-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.capsule{--c:var(--orange);background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:14px 16px 16px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:8px;min-width:0}
+.capsule.sym{--c:var(--berry)} .capsule.life{--c:var(--teal)}
+.capsule label{font-family:var(--display);font-weight:700;font-size:1rem;display:flex;align-items:center;gap:8px}
+.capsule .dot{width:12px;height:12px;border-radius:50%;background:var(--c);flex:none}
+.field{display:flex;gap:8px}
+.field input{flex:1;min-width:0;padding:11px 14px;border-radius:14px;border:1.5px solid var(--line);background:var(--surface-2);color:var(--ink);font-size:1rem}
+.field input:focus{border-color:var(--c);outline:none}
+.btn{border:0;border-radius:14px;padding:10px 16px;font-weight:600;cursor:pointer;color:#fff;background:var(--c,var(--orange));white-space:nowrap}
+.btn:hover{filter:brightness(1.06)}
+.btn[disabled]{opacity:.55;cursor:wait}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--surface-2);color:var(--ink);border-radius:999px;padding:3px 10px;font-size:.82rem;cursor:pointer;text-decoration:none}
+.chip:hover{border-color:var(--c,var(--orange))}
+.chip small{color:var(--muted);font-variant-numeric:tabular-nums}
+
+.result-head{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;justify-content:space-between}
+.result-head > div{min-width:0}
+.eyebrow{font-size:.74rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.result-head h2{font-size:1.65rem;font-weight:800}
+.result-head .sub{color:var(--muted);max-width:70ch;margin:4px 0 0}
+.tags{display:flex;gap:6px;flex-wrap:wrap}
+.tag{font-size:.75rem;font-weight:600;border-radius:999px;padding:3px 10px;background:var(--grey-soft);color:var(--muted)}
+.tag.ai{background:var(--indigo-soft);color:var(--indigo)} .tag.auto{background:var(--teal-soft);color:var(--teal)}
+
+.panes{display:grid;grid-template-columns:1.15fr 1fr .95fr;gap:16px;align-items:start;margin-top:14px}
+.pane{background:var(--surface);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);min-width:0;overflow:hidden}
+.pane-h{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.pane-h h3{font-size:1.02rem;font-weight:700}
+.pane-h .num{margin-left:auto;font-size:.8rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.pane-h .ico{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;flex:none}
+.p1 .ico{background:var(--leaf-soft);color:var(--leaf)} .p2 .ico{background:var(--indigo-soft);color:var(--indigo)} .p3 .ico{background:var(--berry-soft);color:var(--berry)}
+.pane-b{padding:14px 16px 16px;display:flex;flex-direction:column;gap:14px}
+.sec-t{font-size:.74rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:8px}
+.sec-t::after{content:"";flex:1;height:1px;background:var(--line)}
+
+ol.rank{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+ol.rank li{display:grid;grid-template-columns:26px 1fr;gap:10px;align-items:start}
+ol.rank li > div{min-width:0}
+.pos{font-family:var(--display);font-weight:800;font-size:.85rem;width:26px;height:26px;border-radius:8px;display:grid;place-items:center;background:var(--surface-2);border:1px solid var(--line);font-variant-numeric:tabular-nums}
+.r-t{font-weight:500}
+.r-n{color:var(--muted);font-size:.85rem}
+.grade{display:inline-block;font-size:.7rem;font-weight:700;border-radius:6px;padding:1px 7px;margin-right:6px;vertical-align:1px;font-family:var(--display)}
+.g-A{background:var(--leaf-soft);color:var(--leaf)} .g-B{background:var(--sun-soft);color:var(--sun)} .g-C{background:var(--grey-soft);color:var(--muted)}
+.kind{display:inline-block;font-size:.68rem;font-weight:700;border-radius:6px;padding:1px 6px;margin-right:6px;vertical-align:1px}
+.k-h{background:var(--teal-soft);color:var(--teal)} .k-f{background:var(--orange-soft);color:var(--orange)} .k-i{background:var(--berry-soft);color:var(--berry)}
+.freq{display:inline-flex;gap:3px;margin-right:8px;vertical-align:1px}
+.freq i{width:7px;height:7px;border-radius:50%;background:var(--line)}
+.freq i.on{background:var(--orange)}
+.bar{height:6px;border-radius:3px;background:var(--grey-soft);overflow:hidden;display:flex;margin-top:4px}
+.bar .pos-b{background:var(--leaf)} .bar .neg-b{background:var(--berry)} .bar .neu-b{background:var(--line)}
+.side{font-size:.68rem;font-weight:700;color:var(--berry);margin-left:6px}
+.vlink{background:none;border:0;padding:0;color:var(--ink);font-weight:600;cursor:pointer;text-decoration:underline;text-decoration-color:var(--orange);text-underline-offset:3px;text-align:left}
+.legend{font-size:.8rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 12px}
+
+.study{border:1px solid var(--line);border-radius:14px;padding:10px 12px;display:flex;flex-direction:column;gap:4px;background:var(--surface-2)}
+.study .meta{font-size:.8rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center}
+.study .type{font-weight:700;color:var(--indigo)}
+.study .finding{font-size:.92rem;overflow-wrap:anywhere}
+.study .links{display:flex;gap:12px;font-size:.82rem;flex-wrap:wrap}
+.study .about{font-size:.78rem;font-weight:600;color:var(--berry)}
+.verify{font-size:.75rem;color:var(--sun);font-weight:600}
+
+.form{display:grid;gap:2px;padding:10px 12px;border-radius:14px;border:1px dashed var(--line)}
+.form b{font-weight:600}
+.form .dose{font-family:var(--display);font-weight:700;color:var(--berry);font-size:.9rem}
+.form.food .dose{color:var(--orange)} .form.step .dose{color:var(--teal)}
+.form .note{font-size:.85rem;color:var(--muted)}
+.warn{background:var(--sun-soft);border-radius:14px;padding:10px 12px;font-size:.88rem}
+.warn b{color:var(--sun)}
+.shop{display:flex;flex-wrap:wrap;gap:8px}
+.shop a{font-size:.82rem;text-decoration:none;border:1px solid var(--line);padding:4px 10px;border-radius:999px;color:var(--ink)}
+.shop a:hover{border-color:var(--berry)}
+
+.ai-box{background:var(--indigo-soft);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.ai-box .btn{--c:var(--indigo)}
+.ai-box input{padding:9px 12px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);min-width:0;width:100%;max-width:340px}
+.ai-status{font-size:.88rem;color:var(--muted);min-height:1.2em}
+.loading{color:var(--muted);padding:30px 0}
+
+footer{font-size:.8rem;color:var(--muted);display:flex;flex-direction:column;gap:6px;max-width:90ch}
+footer p{margin:0}
+
+@media (max-width:1060px){.search-row{grid-template-columns:1fr 1fr}.capsule.life{grid-column:1/-1}.panes{grid-template-columns:1fr 1fr}.pane.p3{grid-column:1/-1}}
+@media (max-width:720px){.search-row,.panes{grid-template-columns:1fr}.brand h1{font-size:1.45rem}.result-head h2{font-size:1.4rem}}
+@media (prefers-reduced-motion:no-preference){.pane{animation:rise .3s ease both}.pane.p2{animation-delay:.04s}.pane.p3{animation-delay:.08s}
+@keyframes rise{from{transform:translateY(6px)}to{transform:none}}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <svg class="logo" viewBox="0 0 48 48" aria-hidden="true">
+      <g transform="rotate(-35 24 24)"><rect x="6" y="15" width="36" height="18" rx="9" fill="var(--orange)"/><path d="M24 15h9a9 9 0 0 1 0 18h-9z" fill="var(--leaf)"/><rect x="11" y="19" width="8" height="3" rx="1.5" fill="#fff" opacity=".55"/></g>
+    </svg>
+    <div class="brand">
+      <h1>Πυξίδα Βιταμινών</h1>
+      <p>Βιταμίνες, τροφές και συνήθειες, με σειρά τεκμηρίωσης: πρώτα μελέτες, μετά εμπειρίες χρηστών.</p>
+    </div>
+    <span class="kb-stat" id="kbStat">Φόρτωση…</span>
+  </header>
+
+  <section class="search-row" aria-label="Αναζήτηση">
+    <form class="capsule vit" data-types="i">
+      <label for="qI"><span class="dot"></span>Βιταμίνη ή συμπλήρωμα</label>
+      <div class="field"><input id="qI" list="dlI" autocomplete="off" placeholder="π.χ. Μαγνήσιο, D3, Ωμέγα-3"><button class="btn" type="submit">Οφέλη</button></div>
+      <datalist id="dlI"></datalist>
+      <div class="chips" data-chips="i"></div>
+    </form>
+    <form class="capsule sym" data-types="s">
+      <label for="qS"><span class="dot"></span>Πρόβλημα υγείας ή ενόχληση</label>
+      <div class="field"><input id="qS" list="dlS" autocomplete="off" placeholder="π.χ. αϋπνία, κόπωση, τριχόπτωση"><button class="btn" type="submit">Τι βοηθά</button></div>
+      <datalist id="dlS"></datalist>
+      <div class="chips" data-chips="s"></div>
+    </form>
+    <form class="capsule life" data-types="g,h,f">
+      <label for="qL"><span class="dot"></span>Τρόπος ζωής &amp; διατροφή</label>
+      <div class="field"><input id="qL" list="dlL" autocomplete="off" placeholder="π.χ. θέλω αντοχή, κάπνισμα, ψάρια"><button class="btn" type="submit">Βρες</button></div>
+      <datalist id="dlL"></datalist>
+      <div class="chips" data-chips="l"></div>
+    </form>
+  </section>
+
+  <section id="result" aria-live="polite"><p class="loading">Φόρτωση βάσης…</p></section>
+
+  <footer>
+    <p><b>Σημαντικό:</b> Οι πληροφορίες είναι ενημερωτικές και δεν αντικαθιστούν ιατρική συμβουλή. Πριν ξεκινήσετε συμπλήρωμα ή μεγάλη αλλαγή στη διατροφή ή την άσκηση, ειδικά με φάρμακα, εγκυμοσύνη ή χρόνια νόσο, συμβουλευτείτε γιατρό ή φαρμακοποιό.</p>
+    <p><b>Βαθμοί τεκμηρίωσης:</b> A = ισχυρή (μεγάλα RCT ή μετα-αναλύσεις), B = μέτρια, C = ασθενής, μικτή ή αρνητική. Οι εμπειρίες χρηστών είναι ανέκδοτες: δείχνουν τι επαναλαμβάνεται συχνά, όχι τι είναι αποδεδειγμένο.</p>
+  </footer>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = s => document.querySelector(s);
+  const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const norm = s => String(s||"").toLowerCase().normalize("NFD").replace(/\p{M}/gu,"").replace(/ς/g,"σ").replace(/[^\p{L}\p{N} ]/gu," ").replace(/\s+/g," ").trim();
+  const GRADE = {A:3,B:2,C:1};
+  const FREQ = {3:"πολύ συχνή αναφορά",2:"συχνή αναφορά",1:"περιστασιακή αναφορά"};
+  const TYPE_LABEL = {i:"Βιταμίνη / συμπλήρωμα", s:"Πρόβλημα υγείας", h:"Συνήθεια", f:"Τροφή", g:"Στόχος τρόπου ζωής"};
+  const KIND = {h:"Συνήθεια", f:"Τροφή", i:"Συμπλήρωμα"};
+
+  let INDEX = [];                 // [t, id, name, cat, kw, hash]
+  const memo = new Map();         // "t/id" -> entry (this page view)
+  const extra = new Map();        // entries added by Claude (artifact mode), "t/id" -> entry
+  let MODE = "static", db = null, sample = null;
+  const REPO = (document.querySelector('meta[name="vc-repo"]')?.content || "").replace(/[^\w.\-\/]/g, "");
+
+  /* ---------- small on-device cache: keeps phones light ---------- */
+  const CACHE_PREFIX = "vc:e:", CACHE_MAX = 1200000;  // ~1.2 MB of entries at most
+  function cacheGet(key, hash){
+    try{ const raw = localStorage.getItem(CACHE_PREFIX+key); if(!raw) return null;
+      const o = JSON.parse(raw); if(o.h !== hash) return null;
+      o.at = Date.now(); localStorage.setItem(CACHE_PREFIX+key, JSON.stringify(o)); return o.d; }catch{ return null; }
+  }
+  function cachePut(key, hash, d){
+    try{
+      const val = JSON.stringify({h:hash, at:Date.now(), d});
+      const items = []; let total = val.length;
+      for(let i=0;i<localStorage.length;i++){ const k = localStorage.key(i); if(k && k.startsWith(CACHE_PREFIX) && k !== CACHE_PREFIX+key){ const v = localStorage.getItem(k)||""; total += v.length; let at=0; try{at=JSON.parse(v).at||0}catch{} items.push([k,v.length,at]); } }
+      items.sort((a,b)=>a[2]-b[2]);
+      while(total > CACHE_MAX && items.length){ const [k,len] = items.shift(); localStorage.removeItem(k); total -= len; }
+      localStorage.setItem(CACHE_PREFIX+key, val);
+    }catch{}
+  }
+  async function getEntry(t, id){
+    const key = t+"/"+id;
+    if(extra.has(key)) return extra.get(key);
+    if(memo.has(key)) return memo.get(key);
+    const row = INDEX.find(r => r[0]===t && r[1]===id); if(!row) return null;
+    let d = cacheGet(key, row[5]);
+    if(!d){ const r = await fetch(`data/e/${t}/${encodeURIComponent(id)}.json`); if(!r.ok) return null; d = await r.json(); cachePut(key, row[5], d); }
+    memo.set(key, d); return d;
+  }
+
+  /* ---------- search ---------- */
+  const allRows = () => [...INDEX, ...[...extra.values()].map(e => [e.t, e.id, e.n, e.cat||"", norm([e.n,e.en,...(e.k||[])].join(" ")), "ai"])];
+  function score(q, row){
+    const nq = norm(q); if(!nq) return 0;
+    const nn = norm(row[2]), kw = row[4];
+    if(nn === nq) return 100;
+    if(nn.startsWith(nq) || (` ${kw} `).includes(` ${nq} `)) return 80;
+    if(nn.includes(nq) || kw.includes(nq)) return 60;
+    const words = nq.split(" ").filter(w => w.length > 2 && !["θελω","να","εχω","για","την","τον","του","της","πιο","μου","καλυτερο","καλυτερη"].includes(w));
+    const hit = words.filter(w => kw.includes(w.slice(0, Math.max(4, w.length-2))));
+    return words.length && hit.length ? 30 + 20*hit.length/words.length : 0;
+  }
+  function find(q, types){
+    return allRows().filter(r => types.includes(r[0])).map(r => [r, score(q, r) + (r[0]==="g"?2:0)]).filter(x => x[1] >= 40).sort((a,b)=>b[1]-a[1])[0]?.[0];
+  }
+
+  /* ---------- rendering helpers ---------- */
+  const pubmed = q => "https://pubmed.ncbi.nlm.nih.gov/?term=" + encodeURIComponent(q);
+  const scholar = q => "https://scholar.google.com/scholar?q=" + encodeURIComponent(q);
+  const reddit = q => "https://www.reddit.com/search/?q=" + encodeURIComponent(q);
+  const ICON = {
+    p1:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 21s-7-4.5-9-9.5C1.6 7.8 4 4.5 7.5 4.5c2 0 3.5 1.2 4.5 2.7 1-1.5 2.5-2.7 4.5-2.7 3.5 0 5.9 3.3 4.5 7-2 5-9 9.5-9 9.5z"/></svg>',
+    p2:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.7 3h10.6a2 2 0 0 0 1.7-3l-5-9V3"/><path d="M7.5 15h9"/></svg>',
+    p3:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 20c8 0 14-6 16-16C10 4 4 10 4 20z"/><path d="M4 20 14 10"/></svg>'
+  };
+  const pane = (n, title, count, body) => `<article class="pane p${n}"><div class="pane-h"><span class="ico">${ICON["p"+n]}</span><h3>${title}</h3>${count?`<span class="num">${count}</span>`:""}</div><div class="pane-b">${body}</div></article>`;
+  const freqDots = n => `<span class="freq" title="${FREQ[n]||""}">${[1,2,3].map(i=>`<i class="${i<=n?"on":""}"></i>`).join("")}</span>`;
+  const link = (t, id, label) => `<a class="vlink" href="#${t}-${esc(id)}">${esc(label)}</a>`;
+  const sec = t => `<div class="sec-t">${t}</div>`;
+  const rankList = (rows, empty) => rows.length ? `<ol class="rank">${rows.map((h,i)=>`<li><span class="pos">${i+1}</span><div>${h}</div></li>`).join("")}</ol>` : `<p class="r-n">${empty||"Δεν υπάρχουν ακόμη δεδομένα."}</p>`;
+  const graded = (g, main, note) => `<span class="grade g-${esc(g)}">${esc(g)}</span>${main}${note?`<div class="r-n">${esc(note)}</div>`:""}`;
+  const byGrade = arr => arr.slice().sort((a,b)=>(GRADE[b[1]]||0)-(GRADE[a[1]]||0));
+  const rankOf = t => /μετα-ανάλυση|cochrane|συστηματική|ομπρέλα/i.test(t[3]+t[2]) ? 0 : /rct/i.test(t[3]) ? 1 : 2;
+  const sortStudies = arr => arr.slice().sort((a,b) => rankOf(a)-rankOf(b) || (+b[1]||0)-(+a[1]||0));
+
+  function studyCard(s, verify){
+    const [au, yr, jr, type, n, finding, q, about] = s;
+    const query = q || `${au} ${yr} ${jr}`;
+    return `<div class="study">${about?`<span class="about">${esc(about)}</span>`:""}
+      <div class="meta"><span class="type">${esc(type)}</span><span>${esc(au)}, ${esc(yr)}</span><span>${esc(jr)}</span>${n && n!=="—"?`<span>n = ${esc(n)}</span>`:""}</div>
+      <div class="finding">${esc(finding)}</div>
+      ${verify?`<span class="verify">Από Claude: επαλήθευσε την αναφορά στο PubMed</span>`:""}
+      <div class="links"><a href="${pubmed(query)}" target="_blank" rel="noopener">PubMed</a><a href="${scholar(query)}" target="_blank" rel="noopener">Google Scholar</a></div></div>`;
+  }
+  function autoStudies(a){
+    if(!a?.ps?.length) return "";
+    return sec(`Αυτόματα από PubMed · ${esc(a.upd||"")}`) + a.ps.slice(0,10).map(p => {
+      const [pmid,title,yr,jr,type,cites,au] = p;
+      return `<div class="study"><div class="meta"><span class="type">${esc(type)}</span><span>${esc(au)}${au?", ":""}${esc(yr)}</span><span>${esc(jr)}</span>${cites?`<span>${cites} αναφορές</span>`:""}</div>
+        <div class="finding">${esc(title)}</div><div class="links"><a href="https://pubmed.ncbi.nlm.nih.gov/${encodeURIComponent(pmid)}/" target="_blank" rel="noopener">PMID ${esc(pmid)}</a></div></div>`;
+    }).join("");
+  }
+  function autoForum(a){
+    if(!a?.fc?.length) return "";
+    const max = a.fc[0][1] || 1;
+    return sec(`Ανάλυση ${a.fn} αναρτήσεων φόρουμ`) + rankList(a.fc.slice(0,8).map(([lbl,c,p,n,side]) =>
+      `<span class="r-t">${esc(lbl)}</span>${side?`<span class="side">παρενέργεια</span>`:""}<div class="r-n">επαναλαμβάνεται σε ${c} αναρτήσεις · ${p} θετικές · ${n} αρνητικές</div>
+       <div class="bar" style="width:${Math.max(18, 100*c/max)}%"><span class="pos-b" style="flex:${p}"></span><span class="neu-b" style="flex:${Math.max(0,c-p-n)}"></span><span class="neg-b" style="flex:${n}"></span></div>`));
+  }
+  const autoLit = a => a?.lit?.length ? sec("Συχνότερα αποτελέσματα στους τίτλους μελετών") + `<div class="chips">${a.lit.map(([l,c])=>`<span class="chip">${esc(l)} <small>×${c}</small></span>`).join("")}</div>` : "";
+  const userList = u => rankList((u||[]).slice().sort((a,b)=>b[1]-a[1]).map(x => `${freqDots(x[1])}<span class="r-t">${esc(x[0])}</span><div class="r-n">${FREQ[x[1]]||""}</div>`), "Δεν υπάρχουν ακόμη αναφορές.");
+  const forms = (rows, cls) => (rows||[]).map(f=>`<div class="form ${cls||""}"><b>${esc(f[0])}</b>${f[1]&&f[1]!=="—"?`<span class="dose">${esc(f[1])}</span>`:""}${f[2]&&f[2]!=="—"?`<span class="note">${esc(f[2])}</span>`:""}</div>`).join("");
+  const enName = e => (e.en || e.n).split(/[\/(]/)[0].trim();
+
+  function head(e){
+    const tags = [`<span class="tag">${esc(TYPE_LABEL[e.t])}</span>`];
+    if(e.src === "ai") tags.push(`<span class="tag ai">Εμπλουτισμός Claude · ${esc(e.date||"")}</span>`);
+    if(e.auto?.upd) tags.push(`<span class="tag auto">Αυτόματη ενημέρωση · ${esc(e.auto.upd)}</span>`);
+    return `<div class="result-head"><div><div class="eyebrow">${esc(e.cat||TYPE_LABEL[e.t])}</div><h2>${esc(e.n)}</h2>${e.sum?`<p class="sub">${esc(e.sum)}</p>`:""}</div><div class="tags">${tags.join("")}</div></div>`;
+  }
+
+  /* ---------- views ---------- */
+  function viewSubstance(e){ // vitamins, habits, foods share one layout
+    const en = enName(e), ai = e.src === "ai";
+    const studies = sortStudies(e.s||[]);
+    let p1 = sec("Από μελέτες") + rankList(byGrade(e.b||[]).map(b => graded(b[1], `<span class="r-t">${esc(b[0])}</span>`, b[2])));
+    p1 += autoLit(e.auto);
+    p1 += sec("Από εμπειρίες χρηστών (φόρουμ)") + userList(e.u) + autoForum(e.auto);
+    p1 += `<div class="legend"><a href="${reddit(en+" experience")}" target="_blank" rel="noopener">Εμπειρίες στο Reddit</a></div>`;
+    const rel = e.t==="i" ? e.syms : e.goals;
+    if(rel?.length) p1 += sec(e.t==="i"?"Σχετικά προβλήματα":"Βοηθά στους στόχους") + `<div class="chips">${rel.map(([id,n])=>`<a class="chip" href="#${e.t==="i"?"s":"g"}-${esc(id)}">${esc(n)}</a>`).join("")}</div>`;
+
+    const p2 = (studies.map(s=>studyCard(s, ai)).join("") || `<p class="r-n">Δεν υπάρχουν ακόμη επιλεγμένες μελέτες.</p>`) + autoStudies(e.auto) +
+      `<div class="legend"><a href="${pubmed(en+" randomized controlled trial")}" target="_blank" rel="noopener">RCT στο PubMed</a><a href="${pubmed(en+" meta-analysis")}" target="_blank" rel="noopener">Μετα-αναλύσεις</a><a href="${scholar(en)}" target="_blank" rel="noopener">Google Scholar</a></div>`;
+
+    let p3 = "", p3title = "", p3count = "";
+    if(e.t === "i"){
+      p3title = "Τροφές & συμπληρώματα";
+      if(e.fd?.length || e.foods?.length){
+        p3 += sec("Τροφές αντί για συμπλήρωμα") + forms(e.fd, "food");
+        if(e.foods?.length) p3 += `<div class="chips">${e.foods.map(([id,n])=>`<a class="chip" href="#f-${esc(id)}">${esc(n)} ›</a>`).join("")}</div>`;
+      }
+      p3 += sec("Μορφές συμπληρώματος") + (forms(e.f) || `<p class="r-n">—</p>`);
+      if(e.w) p3 += `<div class="warn"><b>Προσοχή:</b> ${esc(e.w)}</div>`;
+      if(e.auto?.dsld?.length) p3 += sec("Προϊόντα στην αγορά (NIH DSLD)") + rankList(e.auto.dsld.map(([n,b,id])=>`<span class="r-t">${esc(n)}</span>${b?`<div class="r-n">${esc(b)}</div>`:""}${id?`<div class="r-n"><a href="https://dsld.od.nih.gov/label/${encodeURIComponent(id)}" target="_blank" rel="noopener">Ετικέτα</a></div>`:""}`));
+      p3 += sec("Αναζήτηση προϊόντων") + `<div class="shop"><a href="https://www.skroutz.gr/search?keyphrase=${encodeURIComponent(e.n)}" target="_blank" rel="noopener">Skroutz</a><a href="https://www.iherb.com/search?kw=${encodeURIComponent(en)}" target="_blank" rel="noopener">iHerb</a><a href="https://dsld.od.nih.gov/search/${encodeURIComponent(en)}" target="_blank" rel="noopener">NIH DSLD</a><a href="https://ods.od.nih.gov/search.aspx?search=${encodeURIComponent(en)}" target="_blank" rel="noopener">NIH ODS</a></div>`;
+      p3count = `${(e.fd||[]).length + (e.f||[]).length} επιλογές`;
+    } else {
+      p3title = e.t === "h" ? "Πώς να ξεκινήσω" : "Πώς να το εντάξω";
+      p3 = forms(e.f, "step") || `<p class="r-n">—</p>`;
+      if(e.nutr?.length) p3 += sec("Θρεπτικά συστατικά") + `<div class="chips">${e.nutr.map(([id,n])=>`<a class="chip" href="#i-${esc(id)}">${esc(n)}</a>`).join("")}</div>`;
+      if(e.w) p3 += `<div class="warn"><b>Προσοχή:</b> ${esc(e.w)}</div>`;
+      p3count = `${(e.f||[]).length} βήματα`;
+    }
+    return head(e) + `<div class="panes">${pane(1, e.t==="i"?"Πού θα ωφεληθώ":"Οφέλη", `${(e.b||[]).length+(e.u||[]).length} σημεία`, p1)}${pane(2, "Επίσημες μελέτες", `${studies.length + (e.auto?.ps?.length||0)} μελέτες`, p2)}${pane(3, p3title, p3count, p3)}</div>`;
+  }
+
+  function viewSymptom(e){
+    const ref = e.ref || {}, nm = id => ref[id]?.n || id;
+    const ev = byGrade(e.v||[]).filter(x => ref[x[0]] || extra.has("i/"+x[0]));
+    let p1 = sec("Από μελέτες") + rankList(ev.map(([id,g,why]) => graded(g, link("i", id, nm(id)), why)));
+    p1 += autoLit(e.auto);
+    p1 += sec("Από εμπειρίες χρηστών (φόρουμ)") + rankList((e.u||[]).map(([id,txt]) => `${link("i", id, nm(id))}<div class="r-n">${esc(txt)}</div>`), "Δεν υπάρχουν ακόμη αναφορές.") + autoForum(e.auto);
+    p1 += `<div class="legend"><a href="${reddit(enName(e)+" supplement helped")}" target="_blank" rel="noopener">Εμπειρίες στο Reddit</a></div>`;
+    const st = e.st || [];
+    const p2 = (st.map(s => studyCard(s, e.src==="ai")).join("") || `<p class="r-n">Δεν υπάρχουν ακόμη επιλεγμένες μελέτες.</p>`) + autoStudies(e.auto) +
+      `<div class="legend"><a href="${pubmed(enName(e)+" supplementation randomized")}" target="_blank" rel="noopener">Περισσότερα στο PubMed</a><a href="${scholar(enName(e)+" vitamin supplementation trial")}" target="_blank" rel="noopener">Google Scholar</a></div>`;
+    const ids = [...new Set([...ev.map(x=>x[0]), ...(e.u||[]).map(x=>x[0])])].slice(0,4);
+    let p3 = "";
+    const foodRows = ids.map(id => ref[id]?.fd0 ? [`${nm(id)}: ${ref[id].fd0[0]}`, ref[id].fd0[1], ref[id].fd0[2]] : null).filter(Boolean);
+    if(foodRows.length) p3 += sec("Πρώτα από τη διατροφή") + forms(foodRows, "food");
+    const formRows = ids.map(id => ref[id]?.f0 ? [`${nm(id)}: ${ref[id].f0[0]}`, ref[id].f0[1], ref[id].f0[2]] : null).filter(Boolean);
+    if(formRows.length) p3 += sec("Συμπληρώματα") + forms(formRows);
+    if(e.life?.length) p3 += sec("Τρόπος ζωής & τροφές") + rankList(e.life.map(([t,id,n,g,why]) => graded(g, `<span class="kind k-${t}">${KIND[t]}</span>${link(t,id,n)}`, why))) + (e.goalref?`<div class="legend"><a href="#g-${esc(e.goalref[0])}">Όλα για «${esc(e.goalref[1])}» ›</a></div>`:"");
+    p3 += `<div class="warn"><b>Προσοχή:</b> Αν το σύμπτωμα επιμένει, κάντε πρώτα εξετάσεις. Πολλά οφέλη ισχύουν μόνο όταν υπάρχει έλλειψη.</div>`;
+    return head(Object.assign({sum:"Βιταμίνες, τροφές και συνήθειες που μπορεί να βοηθήσουν, με σειρά τεκμηρίωσης. Πατήστε ένα όνομα για λεπτομέρειες."}, e)) +
+      `<div class="panes">${pane(1,"Τι μπορεί να βοηθήσει",`${ev.length+(e.u||[]).length} σημεία`,p1)}${pane(2,"Επίσημες μελέτες",`${st.length+(e.auto?.ps?.length||0)} μελέτες`,p2)}${pane(3,"Διατροφή, συμπληρώματα & ζωή","",p3)}</div>`;
+  }
+
+  function viewGoal(e){
+    const ref = e.ref || {}, nm = (t,id) => ref[t+":"+id]?.n || id;
+    let p1 = sec("Συνήθειες (από μελέτες)") + rankList(byGrade(e.v||[]).map(([id,g,why]) => graded(g, `<span class="kind k-h">Συνήθεια</span>${link("h",id,nm("h",id))}`, why)));
+    if(e.fd?.length) p1 += sec("Τροφές (από μελέτες)") + rankList(byGrade(e.fd).map(([id,g,why]) => graded(g, `<span class="kind k-f">Τροφή</span>${link("f",id,nm("f",id))}`, why)));
+    p1 += autoLit(e.auto);
+    p1 += sec("Από εμπειρίες χρηστών (φόρουμ)") + rankList((e.u||[]).map(([id,txt]) => `${link("h",id,nm("h",id))}<div class="r-n">${esc(txt)}</div>`), "Δεν υπάρχουν ακόμη αναφορές.") + autoForum(e.auto);
+    const st = e.st || [];
+    const p2 = (st.map(s => studyCard(s)).join("") || `<p class="r-n">Δεν υπάρχουν ακόμη επιλεγμένες μελέτες.</p>`) + autoStudies(e.auto) +
+      `<div class="legend"><a href="${pubmed(enName(e)+" lifestyle intervention")}" target="_blank" rel="noopener">Περισσότερα στο PubMed</a></div>`;
+    const top = byGrade(e.v||[]).slice(0,3).map(([id]) => ref["h:"+id]?.f0 ? [`${nm("h",id)}: ${ref["h:"+id].f0[0]}`, ref["h:"+id].f0[1], ref["h:"+id].f0[2]] : null).filter(Boolean);
+    let p3 = sec("Πρώτα βήματα") + forms(top, "step");
+    if(e.x?.length) p3 += sec("Συμπληρώματα, αν χρειάζεται") + rankList(e.x.map(([id,why]) => `<span class="kind k-i">Συμπλήρωμα</span>${link("i",id,nm("i",id))}${why?`<div class="r-n">${esc(why)}</div>`:""}`));
+    return head(Object.assign({sum:"Αλλαγές στον τρόπο ζωής και στη διατροφή που βοηθούν, με σειρά τεκμηρίωσης."}, e)) +
+      `<div class="panes">${pane(1,"Τι βοηθά",`${(e.v||[]).length+(e.fd||[]).length} επιλογές`,p1)}${pane(2,"Επίσημες μελέτες",`${st.length+(e.auto?.ps?.length||0)} μελέτες`,p2)}${pane(3,"Πώς να ξεκινήσω","",p3)}</div>`;
+  }
+
+  async function show(t, id, scroll){
+    const e = await getEntry(t, id);
+    if(!e){ $("#result").innerHTML = `<p class="loading">Η καταχώριση δεν βρέθηκε.</p>`; return; }
+    e.t = e.t || t;
+    $("#result").innerHTML = t==="s" ? viewSymptom(e) : t==="g" ? viewGoal(e) : viewSubstance(e);
+    const input = {i:"#qI", s:"#qS"}[t] || "#qL"; $(input).value = e.n;
+    if(scroll) $("#result").scrollIntoView({behavior:"smooth", block:"start"});
+  }
+  function route(scroll){
+    const m = /^#([ishfg])-(.+)$/.exec(location.hash);
+    if(m) show(m[1], decodeURIComponent(m[2]), scroll);
+  }
+  const go = (t, id) => { const h = `#${t}-${id}`; if(location.hash === h) route(true); else location.hash = h; };
+
+  /* ---------- not found: server discovery or Claude enrichment ---------- */
+  function viewMissing(types, q){
+    const kind = types[0] === "g" ? "h" : types[0];
+    const latin = /[a-z]/i.test(q) ? q : "";
+    const canServer = MODE === "server", canAI = !!sample;
+    $("#result").innerHTML = `<div class="result-head"><div><div class="eyebrow">Νέα αναζήτηση</div><h2>«${esc(q)}»</h2><p class="sub">Δεν υπάρχει ακόμη στη βάση.</p></div></div>
+      <div class="panes" style="grid-template-columns:1fr"><article class="pane"><div class="pane-b">
+        ${canServer ? `<div class="ai-box"><b>Αυτόματη άντληση από PubMed, Europe PMC και Reddit</b>
+          <span>Ο server αναζητά μελέτες και εμπειρίες, μετρά πόσο επαναλαμβάνεται κάθε αποτέλεσμα και προσθέτει την καταχώριση στη βάση για όλους.</span>
+          <label for="enTerm" class="r-n">Ο όρος στα αγγλικά (για PubMed)</label><input id="enTerm" value="${esc(latin)}" placeholder="π.χ. ashwagandha, intermittent fasting">
+          <div><button class="btn" id="discGo" type="button">Άντληση δεδομένων</button></div><div class="ai-status" id="discSt"></div></div>` : ""}
+        ${canAI ? `<div class="ai-box"><b>Εμπλουτισμός με Claude</b><span>Το Claude συντάσσει καταχώριση με την ίδια δομή και αποθηκεύεται. Οι μελέτες σημειώνονται για επαλήθευση.</span>
+          <div><button class="btn" id="aiGo" type="button">Πρόσθεσε το «${esc(q)}»</button></div><div class="ai-status" id="aiSt"></div></div>` : ""}
+        ${!canServer && REPO ? `<div class="ai-box"><b>Ζήτησε προσθήκη στη βάση</b>
+          <span>Ανοίγει μια φόρμα στο GitHub (χρειάζεται λογαριασμός). Μόλις την υποβάλετε, η αυτόματη άντληση από PubMed, Europe PMC και Reddit τρέχει μόνη της και η καταχώριση εμφανίζεται εδώ σε λίγα λεπτά.</span>
+          <label for="enTerm2" class="r-n">Ο όρος στα αγγλικά (για PubMed)</label><input id="enTerm2" value="${esc(latin)}" placeholder="π.χ. intermittent fasting">
+          <div><a class="btn" id="reqGo" href="#" target="_blank" rel="noopener" style="text-decoration:none;display:inline-block">Άνοιγμα φόρμας</a></div></div>` : ""}
+        ${!canServer && !canAI && !REPO ? `<p class="r-n">Ο εμπλουτισμός χρειάζεται τον server της εφαρμογής ή το Claude.</p>` : ""}
+        ${sec("Ή ψάξτε απευθείας")}<div class="shop"><a href="${pubmed(q)}" target="_blank" rel="noopener">PubMed</a><a href="${scholar(q)}" target="_blank" rel="noopener">Google Scholar</a><a href="${reddit(q)}" target="_blank" rel="noopener">Reddit</a></div>
+      </div></article></div>`;
+    if(canServer) $("#discGo").onclick = async () => {
+      const b = $("#discGo"), st = $("#discSt"); b.disabled = true; st.textContent = "Άντληση… (έως ένα λεπτό)";
+      try{
+        const r = await fetch("api/discover", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({kind, q, en:$("#enTerm").value.trim()})});
+        const j = await r.json(); if(!r.ok) throw new Error(j.error || r.status);
+        await loadIndex(); go(j.t, j.id);
+      }catch(err){ st.textContent = String(err.message || err); b.disabled = false; }
+    };
+    if(canAI) $("#aiGo").onclick = () => enrich(kind, q);
+    if(!canServer && REPO){
+      const upd = () => { const body = `kind: ${kind}\nq: ${q}\nen: ${$("#enTerm2").value.trim()}\n\n(Μην αλλάξετε τις παραπάνω γραμμές. Το kind: i=συμπλήρωμα, s=πρόβλημα, h=συνήθεια, f=τροφή.)`;
+        $("#reqGo").href = `https://github.com/${REPO}/issues/new?title=${encodeURIComponent("Προσθήκη: " + q)}&body=${encodeURIComponent(body)}`; };
+      upd(); $("#enTerm2").addEventListener("input", upd);
+    }
+  }
+
+  function promptFor(kind, q){
+    const common = `Γράψε στα ελληνικά, ακριβής και συντηρητικός. Βαθμός τεκμηρίωσης: "A" ισχυρή, "B" μέτρια, "C" ασθενής/μικτή. Στις μελέτες βάλε ΜΟΝΟ πραγματικές δημοσιεύσεις για τις οποίες είσαι σίγουρος, αλλιώς κενή λίστα. Εμπειρίες χρηστών: ό,τι αναφέρεται συχνά σε φόρουμ, συχνότητα 1-3. Απάντησε ΜΟΝΟ με JSON.`;
+    const shape = `{"n":"ελληνικό όνομα","en":"English name","k":["συνώνυμα"],"cat":"κατηγορία","sum":"1-2 προτάσεις","b":[["όφελος","A|B|C","σημείωση"]],"u":[["εμπειρία χρηστών",1]],"s":[["Πρώτος συγγραφέας","έτος","περιοδικό","RCT|Μετα-ανάλυση|Συστηματική ανασκόπηση|Κοορτή","n","εύρημα","αγγλικοί όροι PubMed"]],"f":[["${kind==="i"?"μορφή συμπληρώματος":"βήμα"}","${kind==="i"?"δόση":"λεπτομέρεια"}","σημείωση"]]${kind==="i"?`,"fd":[["τροφή-πηγή","ποσότητα","σημείωση"]]`:""},"w":"προφυλάξεις"}`;
+    if(kind === "s"){
+      const ids = INDEX.filter(r=>r[0]==="i").map(r=>`${r[1]}=${r[2]}`).join(", ");
+      return `${common}\nΠρόβλημα: "${q}". Ποιες βιταμίνες/συμπληρώματα βοηθούν; Id υπαρχόντων: ${ids}.\nΜορφή: {"n":"...","en":"English","k":[],"v":[["id","A|B|C","γιατί"]],"u":[["id","τι αναφέρουν οι χρήστες"]],"refNames":{"id":"όνομα"}}\nΑν δεν αφορά υγεία: {"error":"εξήγηση"}.`;
+    }
+    const what = {i:"συμπλήρωμα/βιταμίνη", h:"συνήθεια ή αλλαγή τρόπου ζωής", f:"τροφή"}[kind];
+    return `${common}\nΦτιάξε καταχώριση για ${what}: "${q}".\nΜορφή: ${shape}\nΑν δεν ταιριάζει: {"error":"εξήγηση"}.`;
+  }
+  async function enrich(kind, q){
+    const b = $("#aiGo"), st = $("#aiSt"); b.disabled = true; st.textContent = "Το Claude γράφει την καταχώριση… (20–60 δευτερόλεπτα)";
+    try{
+      const r = await sample.json(promptFor(kind, q), {modelTier:"default"});
+      if(!r || r.error){ st.textContent = r?.error || "Δεν βρέθηκε κατάλληλη απάντηση."; b.disabled = false; return; }
+      const id = "ai-" + norm(r.en||q).replace(/[^a-z0-9 ]/g,"").trim().replace(/ +/g,"-").slice(0,40) + "-" + Date.now().toString(36);
+      const e = Object.assign({}, r, {t:kind, id, src:"ai", date:new Date().toLocaleDateString("el-GR")});
+      e.k = [...new Set([...(e.k||[]), q])];
+      if(kind === "s"){ e.ref = {}; for(const [rid] of [...(e.v||[]), ...(e.u||[])]){ const row = INDEX.find(x=>x[0]==="i"&&x[1]===rid); e.ref[rid] = {n: row?.[2] || r.refNames?.[rid] || rid}; } }
+      extra.set(kind+"/"+id, e);
+      if(db){ try{ await db.collection("entries").doc(`${kind}-${id}`).set(JSON.parse(JSON.stringify(e))); }catch(err){ console.warn(err); } }
+      refreshLists(); go(kind, id);
+    }catch(err){
+      st.textContent = ({not_granted:"Δεν δόθηκε άδεια χρήσης του Claude.", rate_limited:"Πολλά αιτήματα. Δοκιμάστε ξανά σε λίγο.", invalid_json:"Η απάντηση δεν ήταν σωστή. Δοκιμάστε ξανά."})[err?.code] || "Κάτι πήγε στραβά: " + (err?.message || "");
+      b.disabled = false;
+    }
+  }
+
+  /* ---------- wiring ---------- */
+  document.querySelectorAll("form.capsule").forEach(f => f.addEventListener("submit", ev => {
+    ev.preventDefault();
+    const q = f.querySelector("input").value.trim(); if(!q) return;
+    const types = f.dataset.types.split(",");
+    const row = find(q, types);
+    if(row) go(row[0], row[1]); else { history.replaceState(null, "", location.pathname + location.search); viewMissing(types, q); $("#result").scrollIntoView({behavior:"smooth"}); }
+  }));
+  window.addEventListener("hashchange", () => route(true));
+
+  const CHIPS = {i:[["i","vitd"],["i","mg"],["i","omega3"],["i","b12"],["i","zn"]], s:[["s","insomnia"],["s","fatigue"],["s","anxiety"],["s","hair"],["s","cramps"]], l:[["g","endurance"],["h","quit-smoking"],["g","sleep-goal"],["f","fatty-fish"],["g","heart-goal"],["f","legumes"]]};
+  function refreshLists(){
+    const rows = allRows();
+    const opt = types => rows.filter(r=>types.includes(r[0])).map(r=>`<option value="${esc(r[2])}">`).join("");
+    $("#dlI").innerHTML = opt(["i"]); $("#dlS").innerHTML = opt(["s"]); $("#dlL").innerHTML = opt(["g","h","f"]);
+    for(const [k, list] of Object.entries(CHIPS)){
+      $(`[data-chips="${k}"]`).innerHTML = list.map(([t,id]) => { const r = rows.find(x=>x[0]===t&&x[1]===id); return r ? `<a class="chip" href="#${t}-${id}">${esc(r[2])}</a>` : ""; }).join("");
+    }
+    const c = t => rows.filter(r=>r[0]===t).length;
+    $("#kbStat").textContent = `${c("i")} συμπληρώματα · ${c("s")} προβλήματα · ${c("h")+c("g")} συνήθειες/στόχοι · ${c("f")} τροφές`;
+  }
+  async function loadIndex(){
+    const r = await fetch("data/index.json", {cache:"no-cache"});
+    const j = await r.json(); INDEX = j.e; refreshLists(); return j;
+  }
+
+  (async () => {
+    try{ await loadIndex(); }
+    catch{ $("#result").innerHTML = `<p class="loading">Η βάση δεν φόρτωσε. Ελέγξτε τη σύνδεση και ανανεώστε.</p>`; return; }
+    try{ const h = await fetch("api/health", {cache:"no-store"}); if(h.ok && (await h.json()).mode === "server") MODE = "server"; }catch{}
+    if(MODE === "server" && "serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js").catch(()=>{}); }
+    if(location.hash) route(false); else show("i", "mg", false);
+  })();
+
+  if(window.claude?.use){
+    claude.use("sample").then(s => { sample = s; }).catch(()=>{});
+    claude.use("db").then(d => {
+      if(!d) return; db = d;
+      d.collection("entries").onSnapshot(snap => {
+        snap.docChanges().forEach(ch => { const e = ch.doc.data() || {}; const key = e.t+"/"+e.id; if(ch.type==="removed") extra.delete(key); else if(e.t && e.id) extra.set(key, e); });
+        refreshLists();
+      }, err => console.warn("db", err));
+    }).catch(()=>{});
+  }
+})();
+</script>

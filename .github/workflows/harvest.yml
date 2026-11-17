@@ -1,0 +1,99 @@
+name: Άντληση δεδομένων και δημοσίευση
+
+on:
+  schedule:
+    - cron: "17 3 * * 0"        # κάθε Κυριακή 03:17 UTC
+  workflow_dispatch:             # χειροκίνητα από την καρτέλα Actions
+    inputs:
+      all:
+        description: "Ανανέωση όλων των καταχωρίσεων (όχι μόνο των παλιών)"
+        type: boolean
+        default: false
+  push:
+    branches: [main]
+    paths: ["app/**", "server/**", ".github/workflows/**"]
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  issues: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: harvest
+  cancel-in-progress: false
+
+jobs:
+  harvest:
+    # Νέα αίτηση προσθήκης: μόνο issues με τίτλο που ξεκινά από «Προσθήκη:»
+    if: github.event_name != 'issues' || startsWith(github.event.issue.title, 'Προσθήκη:')
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    env:
+      NCBI_API_KEY: ${{ secrets.NCBI_API_KEY }}
+      NCBI_EMAIL: ${{ secrets.NCBI_EMAIL }}
+      REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
+      REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Έλεγχοι
+        working-directory: server
+        run: python tests/test_offline.py
+
+      - name: Άντληση (εβδομαδιαία ή χειροκίνητη)
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        working-directory: server
+        run: python -m vitapp.harvest ${{ inputs.all && '--all' || '' }}
+
+      - name: Άντληση νέας αναζήτησης από issue
+        if: github.event_name == 'issues'
+        working-directory: server
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: python -m vitapp.discover_issue | tee ../issue-result.txt
+
+      - name: Δημιουργία δεδομένων (μετά από αλλαγή κώδικα)
+        if: github.event_name == 'push'
+        working-directory: server
+        run: python -m vitapp.harvest --build
+
+      - name: Αποθήκευση νέων δεδομένων στο repository
+        run: |
+          git config user.name "vitamin-bot"
+          git config user.email "vitamin-bot@users.noreply.github.com"
+          git add app/data server/state
+          if ! git diff --cached --quiet; then
+            git commit -m "Ενημέρωση δεδομένων $(date -u +%F)"
+            git pull --rebase --autostash
+            git push
+          fi
+
+      - name: Απάντηση στο issue
+        if: github.event_name == 'issues'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ github.event.issue.number }}
+        run: |
+          gh issue comment "$ISSUE" --body-file issue-result.txt
+          gh issue close "$ISSUE"
+
+      - name: Δημιουργία ιστοσελίδας
+        working-directory: server
+        run: python -m vitapp.site ../site
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - uses: actions/deploy-pages@v4
+        id: deploy
