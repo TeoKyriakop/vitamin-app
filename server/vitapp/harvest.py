@@ -24,6 +24,8 @@ def is_stale(t, id_):
     a = store.read_json(store.auto_path(t, id_))
     if not a or time.time() - a.get("ts", 0) > REFRESH_DAYS * 86400:
         return True
+    if "po" not in a:   # harvested before "other studies" existed
+        return True
     # YouTube has a daily quota: entries still missing it are retried on the next days
     return bool(os.environ.get("YOUTUBE_API_KEY")) and "youtube" not in (a.get("fsrc") or {})
 
