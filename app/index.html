@@ -42,7 +42,11 @@ header.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 .capsule.sym{--c:var(--berry)} .capsule.life{--c:var(--teal)} .capsule.faq{--c:var(--indigo)}
 .capsule label{font-family:var(--display);font-weight:700;font-size:1rem;display:flex;align-items:center;gap:8px}
 .capsule .dot{width:12px;height:12px;border-radius:50%;background:var(--c);flex:none}
-.field{display:flex;gap:8px}
+.field{display:flex;gap:8px;position:relative}
+.suggest{position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:30;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:4px;display:flex;flex-direction:column;max-height:min(50vh,340px);overflow:auto}
+.suggest button{all:unset;cursor:pointer;display:flex;flex-direction:column;gap:1px;padding:10px 12px;border-radius:10px;color:var(--ink);font-size:.98rem;line-height:1.3}
+.suggest button small{color:var(--muted);font-size:.78rem}
+.suggest button:hover,.suggest button.on,.suggest button:focus-visible{background:var(--surface-2)}
 .field input{flex:1;min-width:0;padding:11px 14px;border-radius:14px;border:1.5px solid var(--line);background:var(--surface-2);color:var(--ink);font-size:1rem}
 .field input:focus{border-color:var(--c);outline:none}
 .btn{border:0;border-radius:14px;padding:10px 16px;font-weight:600;cursor:pointer;color:#fff;background:var(--c,var(--orange));white-space:nowrap}
@@ -157,26 +161,22 @@ footer p{margin:0}
   <section class="search-row" aria-label="Αναζήτηση">
     <form class="capsule vit" data-types="i">
       <label for="qI"><span class="dot"></span>Βιταμίνη ή συμπλήρωμα</label>
-      <div class="field"><input id="qI" list="dlI" autocomplete="off" placeholder="π.χ. Μαγνήσιο, D3, Ωμέγα-3"><button class="btn" type="submit">Οφέλη</button></div>
-      <datalist id="dlI"></datalist>
+      <div class="field"><input id="qI" autocomplete="off" placeholder="π.χ. Μαγνήσιο, D3, Ωμέγα-3"><button class="btn" type="submit">Οφέλη</button></div>
       <div class="chips" data-chips="i"></div>
     </form>
     <form class="capsule sym" data-types="s">
       <label for="qS"><span class="dot"></span>Πρόβλημα υγείας ή ενόχληση</label>
-      <div class="field"><input id="qS" list="dlS" autocomplete="off" placeholder="π.χ. αϋπνία, κόπωση, τριχόπτωση"><button class="btn" type="submit">Τι βοηθά</button></div>
-      <datalist id="dlS"></datalist>
+      <div class="field"><input id="qS" autocomplete="off" placeholder="π.χ. αϋπνία, κόπωση, τριχόπτωση"><button class="btn" type="submit">Τι βοηθά</button></div>
       <div class="chips" data-chips="s"></div>
     </form>
     <form class="capsule life" data-types="g,h,f">
       <label for="qL"><span class="dot"></span>Τρόπος ζωής &amp; διατροφή</label>
-      <div class="field"><input id="qL" list="dlL" autocomplete="off" placeholder="π.χ. θέλω αντοχή, κάπνισμα, ψάρια"><button class="btn" type="submit">Βρες</button></div>
-      <datalist id="dlL"></datalist>
+      <div class="field"><input id="qL" autocomplete="off" placeholder="π.χ. θέλω αντοχή, κάπνισμα, ψάρια"><button class="btn" type="submit">Βρες</button></div>
       <div class="chips" data-chips="l"></div>
     </form>
     <form class="capsule faq" data-types="q">
       <label for="qQ"><span class="dot"></span>Ρωτήστε</label>
-      <div class="field"><input id="qQ" list="dlQ" autocomplete="off" placeholder="π.χ. πότε να παίρνω τη βιταμίνη D;"><button class="btn" type="submit">Ρώτα</button></div>
-      <datalist id="dlQ"></datalist>
+      <div class="field"><input id="qQ" autocomplete="off" placeholder="π.χ. πότε να παίρνω τη βιταμίνη D;"><button class="btn" type="submit">Ρώτα</button></div>
       <div class="chips" data-chips="q"></div>
     </form>
   </section>
@@ -794,6 +794,40 @@ footer p{margin:0}
     $("#result").scrollIntoView({behavior:"smooth"});
   }));
   window.addEventListener("hashchange", () => route(true));
+
+  /* ---------- suggestions while typing (replaces the browser's own list, which on Android opens full-screen) ---------- */
+  document.querySelectorAll("form.capsule").forEach(f => {
+    const input = f.querySelector("input"), types = f.dataset.types.split(",");
+    const box = document.createElement("div"); box.className = "suggest"; box.hidden = true; box.setAttribute("role", "listbox");
+    f.querySelector(".field").appendChild(box);
+    let items = [], active = -1;
+    const close = () => { box.hidden = true; active = -1; };
+    const pick = r => { input.value = r[2]; close(); input.blur(); go(r[0], r[1]); };
+    const paint = () => box.querySelectorAll("button").forEach((b, i) => b.classList.toggle("on", i === active));
+    input.addEventListener("input", () => {
+      const q = input.value.trim(); active = -1;
+      if(q.length < 2){ close(); return; }
+      items = types[0] === "q" ? faqSearch(q, 6).map(x => x.r)
+        : allRows().filter(r => types.includes(r[0])).map(r => ({r, ...score(q, r)}))
+            .concat(didYouMean(q, types).map(r => ({r, s:20, full:false})))
+            .filter(x => x.s >= 20).sort((a,b) => b.s - a.s).map(x => x.r)
+            .filter((r, i, a) => a.findIndex(x => x[0] === r[0] && x[1] === r[1]) === i).slice(0, 6);
+      if(!items.length){ close(); return; }
+      box.innerHTML = items.map((r, i) => `<button type="button" role="option" data-i="${i}"><span>${esc(r[2])}</span>${types.length > 1 ? `<small>${esc(TYPE_LABEL[r[0]])}</small>` : ""}</button>`).join("");
+      box.hidden = false;
+    });
+    box.addEventListener("pointerdown", ev => ev.preventDefault());   // keep focus so the click lands
+    box.addEventListener("click", ev => { const b = ev.target.closest("button"); if(b) pick(items[+b.dataset.i]); });
+    input.addEventListener("keydown", ev => {
+      if(box.hidden) return;
+      if(ev.key === "ArrowDown"){ active = Math.min(items.length - 1, active + 1); paint(); ev.preventDefault(); }
+      else if(ev.key === "ArrowUp"){ active = Math.max(-1, active - 1); paint(); ev.preventDefault(); }
+      else if(ev.key === "Escape") close();
+      else if(ev.key === "Enter" && active >= 0){ ev.preventDefault(); pick(items[active]); }
+    });
+    input.addEventListener("blur", () => setTimeout(close, 150));
+    f.addEventListener("submit", close);
+  });
   if(NATIVE) document.addEventListener("click", ev => {
     const a = ev.target.closest('a[target="_blank"]'); if(!a) return;
     ev.preventDefault(); const B = window.Capacitor?.Plugins?.Browser;
@@ -803,8 +837,7 @@ footer p{margin:0}
   const CHIPS = {i:[["i","vitd"],["i","mg"],["i","omega3"],["i","b12"],["i","zn"]], s:[["s","insomnia"],["s","fatigue"],["s","anxiety"],["s","hair"],["s","cramps"]], l:[["g","endurance"],["h","quit-smoking"],["g","sleep-goal"],["f","fatty-fish"],["g","heart-goal"],["f","legumes"]], q:[["q","d-when"],["q","fe-everyone"],["q","sleep-best"],["q","natural-safe"],["q","exercise-howmuch"]]};
   function refreshLists(){
     const rows = allRows();
-    const opt = types => rows.filter(r=>types.includes(r[0])).map(r=>`<option value="${esc(r[2])}">`).join("");
-    $("#dlI").innerHTML = opt(["i"]); $("#dlS").innerHTML = opt(["s"]); $("#dlL").innerHTML = opt(["g","h","f"]); $("#dlQ").innerHTML = opt(["q"]);
+
     for(const [k, list] of Object.entries(CHIPS)){
       $(`[data-chips="${k}"]`).innerHTML = list.map(([t,id]) => { const r = rows.find(x=>x[0]===t&&x[1]===id); return r ? `<a class="chip" href="#${t}-${id}">${esc(r[2])}</a>` : ""; }).join("");
     }
