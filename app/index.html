@@ -176,7 +176,7 @@ footer p{margin:0}
     </form>
   </section>
 
-  <section id="result" aria-live="polite"><p class="loading">Φόρτωση βάσης…</p></section>
+  <section id="result" aria-live="polite"></section>
 
   <section class="storage" aria-label="Αποθήκευση">
     <span id="stUse" class="r-n">Αποθηκευμένα στη συσκευή: …</span>
@@ -709,7 +709,8 @@ footer p{margin:0}
     try{ const h = await fetch("api/health", {cache:"no-store"}); if(h.ok && (await h.json()).mode === "server") MODE = "server"; }catch{}
     if(canLive() && "serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js").catch(()=>{}); }
     await loadLive();
-    if(location.hash) route(false); else show("i", "mg", false);
+    if(location.hash) route(false);
+    else { document.querySelectorAll("form.capsule input").forEach(i => i.value = ""); $("#result").innerHTML = ""; }
     showUsage();
   })();
 
