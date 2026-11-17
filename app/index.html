@@ -557,7 +557,9 @@ footer p{margin:0}
     }catch{}
     try{   // PubMed's own spelling correction (e.g. lubrokinase -> lumbrokinase)
       const c = new AbortController(); setTimeout(() => c.abort(), 8000);
-      const xml = await (await fetch("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/espell.fcgi?" + new URLSearchParams({db:"pubmed", term:t, tool:"vitamin-compass"}), {signal:c.signal})).text();
+      const url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/espell.fcgi?" + new URLSearchParams({db:"pubmed", term:t, tool:"vitamin-compass"});
+      const xml = await (eutilsChain = eutilsChain.then(() => fetch(url, {signal:c.signal}).then(r => r.text())).catch(() => ""));
+      eutilsChain = eutilsChain.then(() => new Promise(r => setTimeout(r, 400)));
       const fixed = (/<CorrectedQuery>([^<]*)<\/CorrectedQuery>/.exec(xml)?.[1] || "").trim();
       if(fixed && similar(fixed, t) >= 0.6) return {en: fixed, via: "", guess:true};
     }catch{}
@@ -565,22 +567,37 @@ footer p{margin:0}
   }
   const STUDY = '(meta-analysis[pt] OR systematic review[pt] OR randomized controlled trial[pt] OR clinical trial[pt]) NOT (animals[mh] NOT humans[mh])';
   const OTHER = "NOT (animals[mh] NOT humans[mh]) NOT (comment[pt] OR editorial[pt] OR letter[pt]) NOT (meta-analysis[pt] OR systematic review[pt] OR randomized controlled trial[pt] OR clinical trial[pt])";
+  // PubMed allows 3 requests per second without a key; over that it refuses, which the browser reports as a CORS error.
+  // So all PubMed calls go through one queue, spaced out, with one retry.
+  let eutilsChain = Promise.resolve();
+  function eutils(path, params){
+    const url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/" + path + "?" + new URLSearchParams({tool:"vitamin-compass", ...params});
+    const run = async () => { try{ return await getJSON(url); } catch{ await new Promise(r => setTimeout(r, 1500)); return getJSON(url); } };
+    const p = eutilsChain.then(run);
+    eutilsChain = p.catch(() => {}).then(() => new Promise(r => setTimeout(r, 400)));
+    return p;
+  }
+  const typeOf = pts => { const pt = pts.map(x => String(x).toLowerCase());
+    return pt.some(x => x.includes("meta-analysis")) ? "Μετα-ανάλυση" : pt.some(x => x.includes("systematic review")) ? "Συστηματική ανασκόπηση" : pt.some(x => x.includes("randomized controlled trial")) ? "RCT" : pt.some(x => x.includes("clinical trial")) ? "Κλινική μελέτη" : pt.some(x => x.includes("observational study")) ? "Παρατηρητική μελέτη" : pt.some(x => x === "review" || x.includes("review-article")) ? "Ανασκόπηση" : pt.some(x => x.includes("case report")) ? "Αναφορά περιστατικού" : "Μελέτη"; };
   async function livePubmed(term, strong=true){
-    const base = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/";
-    const s = await getJSON(base + "esearch.fcgi?" + new URLSearchParams({db:"pubmed", retmode:"json", retmax:strong?"20":"10", sort:"relevance", tool:"vitamin-compass", term: strong ? `(${term}) AND ${STUDY}` : `(${term}) ${OTHER}`}));
+    const s = await eutils("esearch.fcgi", {db:"pubmed", retmode:"json", retmax:strong?"20":"10", sort:"relevance", term: strong ? `(${term}) AND ${STUDY}` : `(${term}) ${OTHER}`});
     const ids = s.esearchresult?.idlist || []; if(!ids.length) return [];
-    const j = await getJSON(base + "esummary.fcgi?" + new URLSearchParams({db:"pubmed", retmode:"json", tool:"vitamin-compass", id:ids.join(",")}));
-    const out = ids.map(id => { const d = j.result?.[id] || {}; const pt = (d.pubtype||[]).map(x=>x.toLowerCase());
-      const type = pt.includes("meta-analysis") ? "Μετα-ανάλυση" : pt.includes("systematic review") ? "Συστηματική ανασκόπηση" : pt.includes("randomized controlled trial") ? "RCT" : pt.includes("clinical trial") ? "Κλινική μελέτη" : pt.includes("observational study") ? "Παρατηρητική μελέτη" : pt.includes("review") ? "Ανασκόπηση" : pt.includes("case reports") ? "Αναφορά περιστατικού" : "Μελέτη";
-      return [id, (d.title||"").replace(/\.$/,""), (d.pubdate||"").slice(0,4), d.source||"", type, 0, d.authors?.[0]?.name||""]; });
+    let out = null;
+    try{
+      const j = await eutils("esummary.fcgi", {db:"pubmed", retmode:"json", id:ids.join(",")});
+      out = ids.map(id => { const d = j.result?.[id] || {}; return [id, (d.title||"").replace(/\.$/,""), (d.pubdate||"").slice(0,4), d.source||"", typeOf(d.pubtype||[]), 0, d.authors?.[0]?.name||""]; });
+    }catch{}
+    // Europe PMC: citation counts, and the study details too if PubMed refused
     try{
       const q = "(" + ids.map(i=>"EXT_ID:"+i).join(" OR ") + ") AND SRC:MED";
-      const c = await getJSON("https://www.ebi.ac.uk/europepmc/webservices/rest/search?" + new URLSearchParams({query:q, format:"json", resultType:"lite", pageSize:"100"}));
-      const m = Object.fromEntries((c.resultList?.result||[]).map(x => [x.pmid, +x.citedByCount||0]));
-      out.forEach(r => r[5] = m[r[0]] || 0);
+      const c = await getJSON("https://www.ebi.ac.uk/europepmc/webservices/rest/search?" + new URLSearchParams({query:q, format:"json", resultType:"core", pageSize:"100"}));
+      const rows = Object.fromEntries((c.resultList?.result||[]).map(x => [x.pmid, x]));
+      if(!out) out = ids.filter(id => rows[id]).map(id => { const x = rows[id]; return [id, (x.title||"").replace(/\.$/,""), String(x.pubYear||""), x.journalInfo?.journal?.medlineAbbreviation || x.journalTitle || "", typeOf(x.pubTypeList?.pubType||[]), 0, (x.authorString||"").split(",")[0]]; });
+      out.forEach(r => r[5] = +rows[r[0]]?.citedByCount || 0);
     }catch{}
+    if(!out) throw new Error("pubmed");
     const rank = {"Μετα-ανάλυση":0, "Συστηματική ανασκόπηση":1, "RCT":2, "Κλινική μελέτη":3};
-    return out.sort((a,b) => (rank[a[4]]??3) - (rank[b[4]]??3) || b[5]-a[5]).slice(0,15);
+    return out.sort((a,b) => (rank[a[4]]??4) - (rank[b[4]]??4) || b[5]-a[5]).slice(0,15);
   }
   const SE_SITES = {i:["fitness","medicalsciences"], s:["medicalsciences","fitness"], h:["fitness","medicalsciences"], f:["cooking","fitness"]};
   const LIVE_SOURCES = {
