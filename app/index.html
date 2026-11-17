@@ -37,9 +37,9 @@ header.top{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 .brand p{margin:0;color:var(--muted);font-size:.92rem}
 .kb-stat{font-size:.82rem;color:var(--muted);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-variant-numeric:tabular-nums}
 
-.search-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.search-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
 .capsule{--c:var(--orange);background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:14px 16px 16px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:8px;min-width:0}
-.capsule.sym{--c:var(--berry)} .capsule.life{--c:var(--teal)}
+.capsule.sym{--c:var(--berry)} .capsule.life{--c:var(--teal)} .capsule.faq{--c:var(--indigo)}
 .capsule label{font-family:var(--display);font-weight:700;font-size:1rem;display:flex;align-items:center;gap:8px}
 .capsule .dot{width:12px;height:12px;border-radius:50%;background:var(--c);flex:none}
 .field{display:flex;gap:8px}
@@ -111,6 +111,7 @@ ol.rank li > div{min-width:0}
 .shop a{font-size:.82rem;text-decoration:none;border:1px solid var(--line);padding:4px 10px;border-radius:999px;color:var(--ink)}
 .shop a:hover{border-color:var(--berry)}
 
+.answer{font-size:1.05rem;line-height:1.65;margin:0;max-width:70ch}
 .alert{background:var(--berry-soft);color:var(--ink);border-left:4px solid var(--berry);border-radius:12px;padding:10px 14px;font-size:.92rem}
 .alert b{color:var(--berry)}
 .alert.big{margin-top:12px;font-size:.98rem;padding:12px 16px}
@@ -129,7 +130,8 @@ ol.rank li > div{min-width:0}
 footer{font-size:.8rem;color:var(--muted);display:flex;flex-direction:column;gap:6px;max-width:90ch}
 footer p{margin:0}
 
-@media (max-width:1060px){.search-row{grid-template-columns:1fr 1fr}.capsule.life{grid-column:1/-1}.panes{grid-template-columns:1fr 1fr}.pane.p3{grid-column:1/-1}}
+@media (max-width:1180px){.search-row{grid-template-columns:1fr 1fr}}
+@media (max-width:1060px){.panes{grid-template-columns:1fr 1fr}.pane.p3{grid-column:1/-1}}
 @media (max-width:720px){.search-row,.panes{grid-template-columns:1fr}.brand h1{font-size:1.45rem}.result-head h2{font-size:1.4rem}}
 @media (prefers-reduced-motion:no-preference){.pane{animation:rise .3s ease both}.pane.p2{animation-delay:.04s}.pane.p3{animation-delay:.08s}
 @keyframes rise{from{transform:translateY(6px)}to{transform:none}}}
@@ -166,6 +168,12 @@ footer p{margin:0}
       <datalist id="dlL"></datalist>
       <div class="chips" data-chips="l"></div>
     </form>
+    <form class="capsule faq" data-types="q">
+      <label for="qQ"><span class="dot"></span>Ρωτήστε</label>
+      <div class="field"><input id="qQ" list="dlQ" autocomplete="off" placeholder="π.χ. πότε να παίρνω τη βιταμίνη D;"><button class="btn" type="submit">Ρώτα</button></div>
+      <datalist id="dlQ"></datalist>
+      <div class="chips" data-chips="q"></div>
+    </form>
   </section>
 
   <section id="result" aria-live="polite"><p class="loading">Φόρτωση βάσης…</p></section>
@@ -191,7 +199,7 @@ footer p{margin:0}
   const norm = s => String(s||"").toLowerCase().normalize("NFD").replace(/\p{M}/gu,"").replace(/ς/g,"σ").replace(/[^\p{L}\p{N} ]/gu," ").replace(/\s+/g," ").trim();
   const GRADE = {A:3,B:2,C:1};
   const FREQ = {3:"πολύ συχνή αναφορά",2:"συχνή αναφορά",1:"περιστασιακή αναφορά"};
-  const TYPE_LABEL = {i:"Βιταμίνη / συμπλήρωμα", s:"Πρόβλημα υγείας", h:"Συνήθεια", f:"Τροφή", g:"Στόχος τρόπου ζωής"};
+  const TYPE_LABEL = {i:"Βιταμίνη / συμπλήρωμα", s:"Πρόβλημα υγείας", h:"Συνήθεια", f:"Τροφή", g:"Στόχος τρόπου ζωής", q:"Συχνή ερώτηση"};
   const KIND = {h:"Συνήθεια", f:"Τροφή", i:"Συμπλήρωμα"};
 
   let INDEX = [];                 // [t, id, name, cat, kw, hash]
@@ -260,6 +268,15 @@ footer p{margin:0}
     const full = hit.length === words.length;
     return {s: full ? 60 + Math.min(20, 3*words.length) : 25 * hit.length / words.length, full};
   }
+  function faqSearch(q, limit=6){
+    const words = norm(q).split(" ").filter(w => w.length > 2 && !STOP.has(w));
+    if(!words.length) return [];
+    return INDEX.filter(r => r[0] === "q").map(r => {
+      const kw = " " + r[4] + " "; const hit = words.filter(w => kw.includes(stem(w))).length;
+      return {r, f: hit / words.length, hit};
+    }).filter(x => x.hit && x.f >= 0.5).sort((a,b) => b.f - a.f || b.hit - a.hit).slice(0, limit);
+  }
+  const faqList = rows => rankList(rows.map(r => `${link("q", r[1], r[2])}`));
   function search(q, types){
     const ranked = allRows().filter(r => types.includes(r[0])).map(r => ({r, ...score(q, r)})).filter(x => x.s > 0)
       .sort((a,b) => b.s - a.s || (a.r[0]==="g"?-1:1));
@@ -412,17 +429,27 @@ footer p{margin:0}
       `<div class="panes">${pane(1,"Τι βοηθά",`${(e.v||[]).length+(e.fd||[]).length} επιλογές`,p1)}${pane(2,"Επίσημες μελέτες",`${st.length+(e.auto?.ps?.length||0)} μελέτες`,p2)}${pane(3,"Πώς να ξεκινήσω","",p3)}</div>`;
   }
 
+  function viewFaq(e){
+    const refs = (e.refs||[]).map(([t,id,n]) => `<a class="chip" href="#${t}-${esc(id)}">${esc(n)} <small>${esc(TYPE_LABEL[t])}</small></a>`).join("");
+    const more = faqSearch(e.n + " " + (e.k||[]).join(" "), 7).filter(x => x.r[1] !== e.id).slice(0,5).map(x => x.r);
+    return `<div class="result-head"><div><div class="eyebrow">Συχνή ερώτηση</div><h2>${esc(e.n)}</h2></div><div class="tags">${e.g?`<span class="tag"><span class="grade g-${esc(e.g)}">${esc(e.g)}</span>τεκμηρίωση</span>`:""}</div></div>
+      <div class="panes" style="grid-template-columns:minmax(0,2fr) minmax(0,1fr)">
+        ${pane(1, "Απάντηση", "", `<p class="answer">${esc(e.a)}</p>${refs?sec("Δείτε αναλυτικά")+`<div class="chips">${refs}</div>`:""}<div class="legend"><a href="${pubmed((e.k||[])[0]||e.n)}" target="_blank" rel="noopener">Μελέτες στο PubMed</a></div>`)}
+        ${pane(2, "Σχετικές ερωτήσεις", "", more.length ? faqList(more) : `<p class="r-n">—</p>`)}
+      </div>`;
+  }
   async function show(t, id, scroll){
     const e = await getEntry(t, id);
     if(!e){ $("#result").innerHTML = `<p class="loading">Η καταχώριση δεν βρέθηκε.</p>`; return; }
     e.t = e.t || t;
-    $("#result").innerHTML = t==="s" ? viewSymptom(e) : t==="g" ? viewGoal(e) : viewSubstance(e);
-    const input = {i:"#qI", s:"#qS"}[t] || "#qL"; $(input).value = e.n;
+    $("#result").innerHTML = t==="q" ? viewFaq(e) : t==="s" ? viewSymptom(e) : t==="g" ? viewGoal(e) : viewSubstance(e);
+    if(t !== "q" && e.faq?.length) $("#result .pane.p1 .pane-b").insertAdjacentHTML("beforeend", sec("Συχνές ερωτήσεις") + faqList(e.faq.map(([id,n]) => ["q", id, n])));
+    const input = {i:"#qI", s:"#qS", q:"#qQ"}[t] || "#qL"; $(input).value = e.n;
     if(scroll) $("#result").scrollIntoView({behavior:"smooth", block:"start"});
     showUsage();
   }
   function route(scroll){
-    const m = /^#([ishfg])-(.+)$/.exec(location.hash);
+    const m = /^#([ishfgq])-(.+)$/.exec(location.hash);
     if(m) show(m[1], decodeURIComponent(m[2]), scroll);
   }
   const go = (t, id) => { const h = `#${t}-${id}`; if(location.hash === h) route(true); else location.hash = h; };
@@ -538,6 +565,7 @@ footer p{margin:0}
           <span id="liveTerm" class="r-n">Μετάφραση του όρου…</span>
           <div class="live-steps" id="liveSteps"></div>
           <div class="live-edit" id="liveEdit" hidden><label for="enLive" class="r-n">Όρος στα αγγλικά</label><input id="enLive" placeholder="π.χ. sickle cell disease"><button class="btn" id="liveGo" type="button">Αναζήτηση</button></div></div>` : ""}
+        ${faqSearch(q,4).length ? sec("Ίσως σας ενδιαφέρει") + faqList(faqSearch(q,4).map(x=>x.r)) : ""}
         ${partial?.length ? `<div class="alert"><b>Δεν βρέθηκε ακριβώς «${esc(q)}».</b> Τα παρακάτω μοιάζουν, αλλά μπορεί να είναι <b>διαφορετική κατάσταση με διαφορετικές οδηγίες</b>. Ανοίξτε τα μόνο αν είστε σίγουροι ότι σας αφορούν.</div>` + rankList(partial.map(r => `${link(r[0], r[1], r[2])}<div class="r-n">${esc(TYPE_LABEL[r[0]])}</div>`)) : ""}
         ${canServer ? `<div class="ai-box"><b>Αυτόματη άντληση από PubMed, Europe PMC και σχόλια χρηστών</b>
           <span>Ο server αναζητά μελέτες και εμπειρίες, μετρά πόσο επαναλαμβάνεται κάθε αποτέλεσμα και προσθέτει την καταχώριση στη βάση για όλους.</span>
@@ -620,6 +648,16 @@ footer p{margin:0}
     ev.preventDefault();
     const q = f.querySelector("input").value.trim(); if(!q) return;
     const types = f.dataset.types.split(",");
+    if(types[0] === "q"){
+      const exact = INDEX.find(r => r[0]==="q" && norm(r[2]) === norm(q));
+      if(exact) return go("q", exact[1]);
+      const hits = faqSearch(q, 8);
+      history.replaceState(null, "", location.pathname + location.search);
+      $("#result").innerHTML = `<div class="result-head"><div><div class="eyebrow">Ερωτήσεις</div><h2>«${esc(q)}»</h2><p class="sub">${hits.length ? "Ερωτήσεις που ταιριάζουν με όσα γράψατε:" : "Δεν βρέθηκε παρόμοια ερώτηση. Δοκιμάστε άλλες λέξεις ή τα άλλα πεδία αναζήτησης."}</p></div></div>
+        <div class="panes" style="grid-template-columns:1fr"><article class="pane"><div class="pane-b">${hits.length ? faqList(hits.map(x=>x.r)) : ""}</div></article></div>`;
+      if(hits.length === 1) return go("q", hits[0].r[1]);
+      return $("#result").scrollIntoView({behavior:"smooth"});
+    }
     const {full, partial} = search(q, types);
     const top = full[0];
     // several equally good matches (e.g. "θυρεοειδής"): let the person choose instead of guessing
@@ -634,16 +672,16 @@ footer p{margin:0}
   }));
   window.addEventListener("hashchange", () => route(true));
 
-  const CHIPS = {i:[["i","vitd"],["i","mg"],["i","omega3"],["i","b12"],["i","zn"]], s:[["s","insomnia"],["s","fatigue"],["s","anxiety"],["s","hair"],["s","cramps"]], l:[["g","endurance"],["h","quit-smoking"],["g","sleep-goal"],["f","fatty-fish"],["g","heart-goal"],["f","legumes"]]};
+  const CHIPS = {i:[["i","vitd"],["i","mg"],["i","omega3"],["i","b12"],["i","zn"]], s:[["s","insomnia"],["s","fatigue"],["s","anxiety"],["s","hair"],["s","cramps"]], l:[["g","endurance"],["h","quit-smoking"],["g","sleep-goal"],["f","fatty-fish"],["g","heart-goal"],["f","legumes"]], q:[["q","d-when"],["q","fe-everyone"],["q","sleep-best"],["q","natural-safe"],["q","exercise-howmuch"]]};
   function refreshLists(){
     const rows = allRows();
     const opt = types => rows.filter(r=>types.includes(r[0])).map(r=>`<option value="${esc(r[2])}">`).join("");
-    $("#dlI").innerHTML = opt(["i"]); $("#dlS").innerHTML = opt(["s"]); $("#dlL").innerHTML = opt(["g","h","f"]);
+    $("#dlI").innerHTML = opt(["i"]); $("#dlS").innerHTML = opt(["s"]); $("#dlL").innerHTML = opt(["g","h","f"]); $("#dlQ").innerHTML = opt(["q"]);
     for(const [k, list] of Object.entries(CHIPS)){
       $(`[data-chips="${k}"]`).innerHTML = list.map(([t,id]) => { const r = rows.find(x=>x[0]===t&&x[1]===id); return r ? `<a class="chip" href="#${t}-${id}">${esc(r[2])}</a>` : ""; }).join("");
     }
     const c = t => rows.filter(r=>r[0]===t).length;
-    $("#kbStat").textContent = `${c("i")} συμπληρώματα · ${c("s")} προβλήματα · ${c("h")+c("g")} συνήθειες/στόχοι · ${c("f")} τροφές`;
+    $("#kbStat").textContent = `${c("i")} συμπληρώματα · ${c("s")} παθήσεις · ${c("h")+c("g")+c("f")} τρόπος ζωής & διατροφή · ${c("q")} ερωτήσεις`;
   }
   async function loadIndex(){
     const r = await fetch("data/index.json", {cache:"no-cache"});

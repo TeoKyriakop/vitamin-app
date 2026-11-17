@@ -44,13 +44,17 @@ def read_json(path, default=None):
         return default
 
 
-def load_entities():
-    """All entries keyed by (type, id): curated seed files + entries discovered from searches."""
+def load_entities(include_content=True):
+    """All entries keyed by (type, id): curated seed files + entries discovered from searches.
+    Types: i supplement, s condition, h habit, g goal, f food, q frequent question."""
     v = read_json(SEED / "vitamins.json")
     l = read_json(SEED / "lifestyle.json")
     f = read_json(SEED / "foods.json")
+    c = (read_json(SEED / "content.json") if include_content else None) or {}
     ents = {}
-    for t, rows in (("i", v["items"]), ("s", v["symptoms"]), ("h", l["habits"]), ("g", l["goals"]), ("f", f["foods"])):
+    for t, rows in (("i", v["items"] + c.get("items", [])), ("s", v["symptoms"] + c.get("symptoms", [])),
+                    ("h", l["habits"] + c.get("habits", [])), ("g", l["goals"]), ("f", f["foods"] + c.get("foods", [])),
+                    ("q", c.get("faq", []))):
         for r in rows:
             ents[(t, r["id"])] = dict(r)
     for r in read_json(STATE / "discovered.json", []):
@@ -122,7 +126,7 @@ def build_entry(t, id_, ents):
         words = [w for w in {norm(x) for x in [e.get("en", "")] + e.get("k", [])} if len(w) > 3]
         rel = [s for s in allst if any(w[:max(4, len(w) - 2)] in norm(s[5] + " " + s[6]) for w in words)]
         own = sorted([list(x) for x in e.get("s", [])], key=_rank_study)
-        e["st"] = (own + (rel or ([] if own else allst)))[:14]
+        e["st"] = (own + rel)[:14]   # never fill with unrelated studies; the PubMed harvest adds condition-specific ones
         g = ents.get(("g", e.get("goal")))
         if g:
             e["life"] = [["h", x[0], name("h", x[0]), x[1], x[2]] for x in g.get("v", []) if name("h", x[0])][:5] + \
@@ -146,6 +150,10 @@ def build_entry(t, id_, ents):
         e["goals"] = [[k[1], v["n"]] for k, v in ents.items() if k[0] == "g" and any(x[0] == id_ for x in v.get(key, []))]
         if t == "f":
             e["nutr"] = [[x, name("i", x)] for x in e.get("nut", []) if name("i", x)]
+    if t == "q":
+        e["refs"] = [[lt, li, ents[(lt, li)]["n"]] for lt, li in e.get("links", []) if (lt, li) in ents]
+    if t in ("i", "s", "h", "f", "g"):
+        e["faq"] = [[k[1], v["n"]] for k, v in ents.items() if k[0] == "q" and [t, id_] in v.get("links", [])][:6]
     auto = read_json(auto_path(t, id_))
     if auto:
         e["auto"] = auto

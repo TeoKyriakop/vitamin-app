@@ -22,7 +22,10 @@ FORUM_SOURCES = [
 
 def is_stale(t, id_):
     a = store.read_json(store.auto_path(t, id_))
-    return not a or time.time() - a.get("ts", 0) > REFRESH_DAYS * 86400
+    if not a or time.time() - a.get("ts", 0) > REFRESH_DAYS * 86400:
+        return True
+    # YouTube has a daily quota: entries still missing it are retried on the next days
+    return bool(os.environ.get("YOUTUBE_API_KEY")) and "youtube" not in (a.get("fsrc") or {})
 
 
 def harvest_one(t, id_, ents):
@@ -90,7 +93,15 @@ def harvest_one(t, id_, ents):
 
 def run(only=None, everything=False, limit=None):
     ents = store.load_entities()
-    keys = [tuple(only.split("/", 1))] if only else [k for k in sorted(ents) if everything or is_stale(*k)]
+    if only:
+        keys = [tuple(only.split("/", 1))]
+    else:   # oldest (or never harvested) first, so daily batches rotate through everything
+        keys = [k for k in ents if k[0] != "q" and (everything or is_stale(*k))]
+        def order(k):
+            a = store.read_json(store.auto_path(*k), {}) or {}
+            return (bool(a), "youtube" in (a.get("fsrc") or {}), a.get("ts", 0))   # never harvested, then missing YouTube, then oldest
+        keys.sort(key=order)
+    limit = limit or int(os.environ.get("HARVEST_LIMIT", 0)) or None
     if limit:
         keys = keys[:limit]
     for i, (t, id_) in enumerate(keys, 1):
