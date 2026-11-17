@@ -101,7 +101,7 @@ def run(only=None, everything=False, limit=None):
             a = store.read_json(store.auto_path(*k), {}) or {}
             return (bool(a), "youtube" in (a.get("fsrc") or {}), a.get("ts", 0))   # never harvested, then missing YouTube, then oldest
         keys.sort(key=order)
-    limit = limit or int(os.environ.get("HARVEST_LIMIT", 0)) or None
+    limit = limit or int(os.environ.get("HARVEST_LIMIT") or 0) or None
     if limit:
         keys = keys[:limit]
     for i, (t, id_) in enumerate(keys, 1):
