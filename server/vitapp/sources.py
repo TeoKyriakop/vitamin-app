@@ -5,18 +5,37 @@ Europe PMC                 - citation counts for those studies (and a fallback s
 Reddit                     - forum posts and top comments, for user experiences
 NIH DSLD                   - real supplement products on the market
 """
-import json, os, time, base64, threading, urllib.parse, urllib.request, urllib.error, logging
+import gzip, html, json, os, re, time, base64, threading, urllib.parse, urllib.request, urllib.error, logging
 
 log = logging.getLogger("vitapp.sources")
 UA = os.environ.get("VITAPP_USER_AGENT", "VitaminCompass/1.0 (research aggregator)")
 _last = {}
 _lock = threading.Lock()
 MIN_GAP = {"eutils.ncbi.nlm.nih.gov": 0.4 if not os.environ.get("NCBI_API_KEY") else 0.12,
-           "www.ebi.ac.uk": 0.2, "www.reddit.com": 2.5, "oauth.reddit.com": 1.1, "api.ods.od.nih.gov": 0.5}
+           "www.ebi.ac.uk": 0.2, "www.reddit.com": 2.5, "oauth.reddit.com": 1.1, "api.ods.od.nih.gov": 0.5,
+           "www.googleapis.com": 0.2, "hn.algolia.com": 0.3, "api.stackexchange.com": 0.6}
 
 
 class SourceError(Exception):
     pass
+
+
+class QuotaError(SourceError):
+    """The daily allowance of an API is used up: stop calling it for this run."""
+
+
+def _err_body(e):
+    try:
+        raw = e.read()
+        return (gzip.decompress(raw) if raw[:2] == b"\x1f\x8b" else raw).decode("utf-8", "replace")
+    except Exception:
+        return ""
+
+
+def clean_text(t):
+    """HTML to plain text."""
+    t = re.sub(r"<[^>]+>", " ", t or "")
+    return re.sub(r"\s+", " ", html.unescape(t)).strip()
 
 
 def _get(url, headers=None, data=None, tries=3, timeout=25):
@@ -27,11 +46,17 @@ def _get(url, headers=None, data=None, tries=3, timeout=25):
             if wait > 0:
                 time.sleep(wait)
             _last[host] = time.time()
-        req = urllib.request.Request(url, data=data, headers={"User-Agent": UA, "Accept": "application/json", **(headers or {})})
+        req = urllib.request.Request(url, data=data, headers={"User-Agent": UA, "Accept": "application/json",
+                                                               "Accept-Encoding": "gzip", **(headers or {})})
         try:
             with urllib.request.urlopen(req, timeout=timeout) as r:
-                return json.loads(r.read().decode("utf-8"))
+                raw = r.read()
+                if r.headers.get("Content-Encoding") == "gzip" or raw[:2] == b"\x1f\x8b":
+                    raw = gzip.decompress(raw)
+                return json.loads(raw.decode("utf-8"))
         except urllib.error.HTTPError as e:
+            if e.code == 403 and "quota" in _err_body(e).lower():
+                raise QuotaError(f"{host}: quota exceeded") from e
             if e.code in (429, 500, 502, 503, 504) and attempt < tries - 1:
                 time.sleep(2 ** (attempt + 1) * 2)
                 continue
@@ -169,3 +194,72 @@ def dsld_products(term, n=6):
         if name:
             out.append([name, s.get("brandName") or "", str(h.get("_id") or s.get("id") or "")])
     return out[:n]
+
+
+# ---------------------------------------------------------------- YouTube (comments)
+YT = "https://www.googleapis.com/youtube/v3/"
+
+
+def youtube_texts(query, videos=6, per_video=100):
+    """Top comments under the most relevant videos. Needs YOUTUBE_API_KEY (free).
+    Cost: 100 quota units for the search + 1 per video; the free daily quota is 10,000."""
+    key = os.environ.get("YOUTUBE_API_KEY")
+    if not key:
+        raise SourceError("youtube: no YOUTUBE_API_KEY")
+    r = _get(YT + "search?" + urllib.parse.urlencode({"part": "snippet", "q": query, "type": "video", "maxResults": videos,
+                                                       "order": "relevance", "safeSearch": "strict", "key": key}))
+    texts = []
+    for it in r.get("items", []):
+        vid = (it.get("id") or {}).get("videoId")
+        if not vid:
+            continue
+        try:
+            c = _get(YT + "commentThreads?" + urllib.parse.urlencode({"part": "snippet", "videoId": vid, "maxResults": per_video,
+                                                                       "order": "relevance", "textFormat": "plainText", "key": key}), tries=1)
+        except QuotaError:
+            raise
+        except SourceError:  # comments disabled on this video
+            continue
+        for t in c.get("items", []):
+            texts.append(clean_text(t["snippet"]["topLevelComment"]["snippet"].get("textDisplay", "")))
+    return [t for t in texts if len(t) >= 25]
+
+
+# ---------------------------------------------------------------- Hacker News (Algolia)
+def hackernews_texts(query, n=100):
+    r = _get("https://hn.algolia.com/api/v1/search?" + urllib.parse.urlencode({"query": query, "tags": "comment", "hitsPerPage": n}))
+    texts = [clean_text(h.get("comment_text")) for h in r.get("hits", [])]
+    return [t for t in texts if len(t) >= 25]
+
+
+# ---------------------------------------------------------------- Stack Exchange
+SE_SITES = {"i": ["fitness", "medicalsciences"], "s": ["medicalsciences", "fitness"], "h": ["fitness", "medicalsciences"],
+            "f": ["cooking", "fitness"], "g": ["fitness", "medicalsciences"]}
+
+
+def stackexchange_texts(query, kind="i", n=30):
+    texts = []
+    for site in SE_SITES.get(kind, ["fitness"]):
+        params = {"order": "desc", "sort": "relevance", "q": query, "site": site, "filter": "withbody", "pagesize": n}
+        if os.environ.get("STACKEXCHANGE_KEY"):
+            params["key"] = os.environ["STACKEXCHANGE_KEY"]
+        r = _get("https://api.stackexchange.com/2.3/search/advanced?" + urllib.parse.urlencode(params))
+        texts += [clean_text((q.get("title") or "") + " " + (q.get("body") or "")) for q in r.get("items", [])]
+        if r.get("quota_remaining", 1) <= 1:
+            raise QuotaError("stackexchange: quota exceeded")
+    return [t for t in texts if len(t) >= 25]
+
+
+# ---------------------------------------------------------------- Lemmy
+def lemmy_texts(query, n=50):
+    inst = os.environ.get("LEMMY_INSTANCE", "lemmy.world")
+    texts = []
+    for typ, key in (("Comments", "comments"), ("Posts", "posts")):
+        r = _get(f"https://{inst}/api/v3/search?" + urllib.parse.urlencode({"q": query, "type_": typ, "sort": "TopAll", "limit": n}))
+        for x in r.get(key, []):
+            if typ == "Comments":
+                texts.append(clean_text((x.get("comment") or {}).get("content")))
+            else:
+                p = x.get("post") or {}
+                texts.append(clean_text((p.get("name") or "") + " " + (p.get("body") or "")))
+    return [t for t in texts if len(t) >= 25]

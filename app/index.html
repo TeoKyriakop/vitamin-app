@@ -266,8 +266,10 @@ footer p{margin:0}
   function autoForum(a){
     if(!a?.fc?.length) return "";
     const max = a.fc[0][1] || 1;
-    return sec(`Ανάλυση ${a.fn} αναρτήσεων φόρουμ`) + rankList(a.fc.slice(0,8).map(([lbl,c,p,n,side]) =>
-      `<span class="r-t">${esc(lbl)}</span>${side?`<span class="side">παρενέργεια</span>`:""}<div class="r-n">επαναλαμβάνεται σε ${c} αναρτήσεις · ${p} θετικές · ${n} αρνητικές</div>
+    const SRC = {youtube:"YouTube", hackernews:"Hacker News", stackexchange:"Stack Exchange", lemmy:"Lemmy", reddit:"Reddit"};
+    const used = Object.entries(a.fsrc||{}).filter(([,d])=>d.n).map(([s,d])=>`${SRC[s]||s} ${d.n}`).join(" · ");
+    return sec(`Ανάλυση ${a.fn} σχολίων και αναρτήσεων`) + (used?`<div class="legend">Πηγές: ${esc(used)}</div>`:"") + rankList(a.fc.slice(0,8).map(([lbl,c,p,n,side,by]) =>
+      `<span class="r-t">${esc(lbl)}</span>${side?`<span class="side">παρενέργεια</span>`:""}<div class="r-n">επαναλαμβάνεται σε ${c} σχόλια · ${p} θετικά · ${n} αρνητικά${by?" · "+esc(Object.entries(by).sort((x,y)=>y[1]-x[1]).map(([s,k])=>`${SRC[s]||s} ${k}`).join(", ")):""}</div>
        <div class="bar" style="width:${Math.max(18, 100*c/max)}%"><span class="pos-b" style="flex:${p}"></span><span class="neu-b" style="flex:${Math.max(0,c-p-n)}"></span><span class="neg-b" style="flex:${n}"></span></div>`));
   }
   const autoLit = a => a?.lit?.length ? sec("Συχνότερα αποτελέσματα στους τίτλους μελετών") + `<div class="chips">${a.lit.map(([l,c])=>`<span class="chip">${esc(l)} <small>×${c}</small></span>`).join("")}</div>` : "";
@@ -377,7 +379,7 @@ footer p{margin:0}
     const canServer = MODE === "server", canAI = !!sample;
     $("#result").innerHTML = `<div class="result-head"><div><div class="eyebrow">Νέα αναζήτηση</div><h2>«${esc(q)}»</h2><p class="sub">Δεν υπάρχει ακόμη στη βάση.</p></div></div>
       <div class="panes" style="grid-template-columns:1fr"><article class="pane"><div class="pane-b">
-        ${canServer ? `<div class="ai-box"><b>Αυτόματη άντληση από PubMed, Europe PMC και Reddit</b>
+        ${canServer ? `<div class="ai-box"><b>Αυτόματη άντληση από PubMed, Europe PMC και σχόλια χρηστών</b>
           <span>Ο server αναζητά μελέτες και εμπειρίες, μετρά πόσο επαναλαμβάνεται κάθε αποτέλεσμα και προσθέτει την καταχώριση στη βάση για όλους.</span>
           <label for="enTerm" class="r-n">Ο όρος στα αγγλικά (για PubMed)</label><input id="enTerm" value="${esc(latin)}" placeholder="π.χ. ashwagandha, intermittent fasting">
           <div><button class="btn" id="discGo" type="button">Άντληση δεδομένων</button></div><div class="ai-status" id="discSt"></div></div>` : ""}

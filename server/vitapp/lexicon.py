@@ -53,6 +53,35 @@ def outcomes_in(text):
     return found
 
 
+def tally_keys(texts):
+    """{outcome_key: [posts, positive, negative]} for one source."""
+    agg = {}
+    for t in texts:
+        for key, pol in outcomes_in(t).items():
+            a = agg.setdefault(key, [0, 0, 0])
+            a[0] += 1
+            a[1] += pol > 0
+            a[2] += pol < 0
+    return agg
+
+
+def combine(per_source):
+    """Merge per-source tallies {src: {"n":..,"k":{key:[c,p,n]}}} into display rows
+    [[label, count, positive, negative, is_side_effect, {src: count}], ...] sorted by count."""
+    meta = {k: (lbl, side) for k, lbl, _rx, side in OUTCOMES}
+    tot = {}
+    for src, d in per_source.items():
+        for key, (c, p, n) in d.get("k", {}).items():
+            if key not in meta:
+                continue
+            t = tot.setdefault(key, [0, 0, 0, {}])
+            t[0] += c; t[1] += p; t[2] += n
+            t[3][src] = t[3].get(src, 0) + c
+    rows = [[meta[k][0], c, p, n, meta[k][1], by] for k, (c, p, n, by) in tot.items()]
+    rows.sort(key=lambda r: -r[1])
+    return rows
+
+
 def tally(texts):
     """Count, over a list of texts (one per post), how many mention each outcome.
     Returns [[label, count, positive, negative, is_side_effect], ...] sorted by count."""

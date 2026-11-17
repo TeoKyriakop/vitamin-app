@@ -39,6 +39,8 @@ jobs:
       NCBI_EMAIL: ${{ secrets.NCBI_EMAIL }}
       REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
       REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+      YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+      STACKEXCHANGE_KEY: ${{ secrets.STACKEXCHANGE_KEY }}
       PYTHONUNBUFFERED: "1"
     steps:
       - uses: actions/checkout@v5

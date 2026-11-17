@@ -9,7 +9,15 @@ from . import sources, lexicon, store
 log = logging.getLogger("vitapp.harvest")
 REFRESH_DAYS = float(os.environ.get("REFRESH_DAYS", 7))
 DSLD = os.environ.get("VITAPP_DSLD", "1") != "0"
-REDDIT = os.environ.get("VITAPP_REDDIT", "1") != "0"
+_exhausted = set()   # sources whose daily quota ran out during this run
+
+FORUM_SOURCES = [
+    ("youtube", lambda t, e: sources.youtube_texts(store.forum_query(t, e) + {"i": " experience", "s": " what helped", "f": " benefits", "h": " results", "g": " tips"}[t])),
+    ("hackernews", lambda t, e: sources.hackernews_texts(store.forum_query(t, e))),
+    ("stackexchange", lambda t, e: sources.stackexchange_texts(store.forum_query(t, e), t)),
+    ("lemmy", lambda t, e: sources.lemmy_texts(store.forum_query(t, e))),
+    ("reddit", lambda t, e: sources.reddit_texts(store.forum_query(t, e), store.SUBS[t])),
+]
 
 
 def is_stale(t, id_):
@@ -48,14 +56,23 @@ def harvest_one(t, id_, ents):
         auto["lit"] = [[r[0], r[1]] for r in lexicon.tally([s["title"] for s in studies]) if r[1] >= 2][:8]
         auto["pq"] = term
 
-    # 2) forum experiences: count how often each effect repeats across posts
-    if REDDIT:
+    # 2) user experiences: count how often each effect repeats, per source
+    per = dict(prev.get("fsrc") or {})
+    for src, fn in FORUM_SOURCES:
+        if src in _exhausted or os.environ.get(f"VITAPP_{src.upper()}", "1") == "0":
+            continue
         try:
-            texts = sources.reddit_texts(store.forum_query(t, e), store.SUBS[t])
-            auto["fc"], auto["fn"] = [r for r in lexicon.tally(texts) if r[1] >= 2][:12], len(texts)
+            texts = fn(t, e)
+            per[src] = {"n": len(texts), "k": lexicon.tally_keys(texts), "upd": auto["upd"]}
+        except sources.QuotaError as err:
+            _exhausted.add(src)          # stop using this source until the next run
+            auto["err"].append(str(err))
         except sources.SourceError as err:
             auto["err"].append(str(err))
-            auto["fc"], auto["fn"] = prev.get("fc", []), prev.get("fn", 0)
+    if per:
+        auto["fsrc"] = per
+        auto["fn"] = sum(d.get("n", 0) for d in per.values())
+        auto["fc"] = [r for r in lexicon.combine(per) if r[1] >= 2][:12]
 
     # 3) products on the market (supplements only)
     if DSLD and t == "i":

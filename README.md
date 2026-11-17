@@ -3,7 +3,7 @@
 Εφαρμογή για κινητό και υπολογιστή: βιταμίνες, προβλήματα υγείας, τρόπος ζωής και τροφές, με οφέλη ταξινομημένα κατά τεκμηρίωση (πρώτα μελέτες, μετά εμπειρίες χρηστών).
 
 - `app/`: η εφαρμογή (εγκαθίσταται στο κινητό από τον browser)
-- `server/`: η αυτόματη άντληση από PubMed, Europe PMC, Reddit και NIH DSLD ([λεπτομέρειες](server/README.md))
+- `server/`: η αυτόματη άντληση από PubMed, Europe PMC, NIH DSLD και σχόλια χρηστών (YouTube, Hacker News, Stack Exchange, Lemmy, Reddit) ([λεπτομέρειες](server/README.md))
 - `.github/workflows/harvest.yml`: τρέχει την άντληση στο GitHub και δημοσιεύει την εφαρμογή
 
 ## Πώς δουλεύει στο GitHub (δωρεάν, χωρίς υπολογιστή ανοιχτό)
@@ -14,7 +14,8 @@
 ## Ρύθμιση (μία φορά)
 1. **Settings → Pages → Build and deployment → Source: GitHub Actions**.
 2. **Settings → Secrets and variables → Actions → New repository secret** για καθένα:
-   - `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`: από το reddit.com/prefs/apps, «create another app», τύπος **script**, redirect uri `http://localhost`. Το id είναι κάτω από το όνομα της εφαρμογής, το secret δίπλα στο «secret».
+   - `YOUTUBE_API_KEY` (συνιστάται): δωρεάν κλειδί YouTube Data API v3 από το console.cloud.google.com.
+   - `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET` (προαιρετικά): μόνο αν το Reddit σας εγκρίνει πρόσβαση στο API.
    - `NCBI_API_KEY` (προαιρετικό): από τον λογαριασμό NCBI, «API Key Management».
    - `NCBI_EMAIL` (προαιρετικό): το email σας, για να σας ειδοποιήσει το NCBI αν υπάρξει πρόβλημα.
 3. **Actions →** «Άντληση δεδομένων και δημοσίευση» **→ Run workflow**, με επιλεγμένο το «Ανανέωση όλων». Η πρώτη πλήρης άντληση διαρκεί περίπου 1 ώρα.
