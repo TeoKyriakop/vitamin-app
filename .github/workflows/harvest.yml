@@ -80,13 +80,18 @@ jobs:
         run: |
           git config user.name "vitamin-bot"
           git config user.email "vitamin-bot@users.noreply.github.com"
+          # τα παραγόμενα αρχεία της εφαρμογής τα χτίζει η δημοσίευση, δεν αποθηκεύονται εδώ
+          git checkout -- app/data 2>/dev/null || true
+          git clean -fdq app/data 2>/dev/null || true
           git add -A server/state
           if ! git diff --cached --quiet; then
             git commit -m "Ενημέρωση δεδομένων $(date -u +%F)"
+            pushed=0
             for i in 1 2 3 4 5; do
-              git pull --rebase && git push && break
+              if git pull --rebase --autostash && git push; then pushed=1; break; fi
               sleep $((i * 5))
             done
+            [ "$pushed" = 1 ] || { echo "Η αποθήκευση απέτυχε"; exit 1; }
           fi
 
       - name: Απάντηση στο issue
