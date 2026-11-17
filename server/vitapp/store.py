@@ -57,8 +57,12 @@ def load_entities(include_content=True):
                     ("q", c.get("faq", []))):
         for r in rows:
             ents[(t, r["id"])] = dict(r)
-    for r in read_json(STATE / "discovered.json", []):
+    for r in read_json(STATE / "discovered.json", []) or []:   # older single-file format
         ents.setdefault((r["t"], r["id"]), dict(r))
+    for p in sorted((STATE / "discovered").glob("*/*.json")):   # one file per entry
+        r = read_json(p)
+        if r:
+            ents.setdefault((r["t"], r["id"]), dict(r))
     return ents
 
 

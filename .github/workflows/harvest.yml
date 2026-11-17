@@ -9,6 +9,18 @@ on:
         description: "Ανανέωση όλων των καταχωρίσεων (όχι μόνο των παλιών)"
         type: boolean
         default: false
+      kind:
+        description: "Νέα αναζήτηση: είδος (i, s, h, f). Το συμπληρώνει το Cloudflare Worker"
+        required: false
+        default: ""
+      q:
+        description: "Νέα αναζήτηση: όνομα"
+        required: false
+        default: ""
+      en:
+        description: "Νέα αναζήτηση: όρος στα αγγλικά"
+        required: false
+        default: ""
   issues:
     types: [opened]
 
@@ -19,7 +31,8 @@ permissions:
   id-token: write
 
 concurrency:
-  group: harvest
+  # Οι νέες αναζητήσεις τρέχουν παράλληλα με την καθημερινή άντληση, μία ομάδα ανά όρο
+  group: ${{ github.event_name == 'workflow_dispatch' && inputs.en != '' && format('discover-{0}-{1}', inputs.kind, inputs.en) || github.event_name == 'issues' && format('issue-{0}', github.event.issue.number) || 'harvest' }}
   cancel-in-progress: false
 # Η δημοσίευση γίνεται από το deploy.yml (και αμέσως μετά από κάθε αλλαγή κώδικα)
 
@@ -48,27 +61,32 @@ jobs:
         working-directory: server
         run: python tests/test_offline.py
 
-      - name: Άντληση (εβδομαδιαία ή χειροκίνητη)
-        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+      - name: Άντληση (καθημερινή ή χειροκίνητη)
+        if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.en == '')
         working-directory: server
         run: python -m vitapp.harvest ${{ inputs.all && '--all' || '' }}
 
-      - name: Άντληση νέας αναζήτησης από issue
-        if: github.event_name == 'issues'
+      - name: Άντληση νέας αναζήτησης (από την εφαρμογή ή από issue)
+        if: github.event_name == 'issues' || (github.event_name == 'workflow_dispatch' && inputs.en != '')
         working-directory: server
         env:
           ISSUE_BODY: ${{ github.event.issue.body }}
+          DISCOVER_KIND: ${{ inputs.kind }}
+          DISCOVER_Q: ${{ inputs.q }}
+          DISCOVER_EN: ${{ inputs.en }}
         run: python -m vitapp.discover_issue | tee ../issue-result.txt
 
       - name: Αποθήκευση νέων δεδομένων στο repository
         run: |
           git config user.name "vitamin-bot"
           git config user.email "vitamin-bot@users.noreply.github.com"
-          git add -A app/data server/state
+          git add -A server/state
           if ! git diff --cached --quiet; then
             git commit -m "Ενημέρωση δεδομένων $(date -u +%F)"
-            git pull --rebase --autostash
-            git push
+            for i in 1 2 3 4 5; do
+              git pull --rebase && git push && break
+              sleep $((i * 5))
+            done
           fi
 
       - name: Απάντηση στο issue

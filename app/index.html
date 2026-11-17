@@ -549,6 +549,15 @@ footer p{margin:0}
     if(all.length) refreshLists();
   }
   const canLive = () => !window.claude && location.protocol.startsWith("http");
+  let WORKER = "";
+  const configReady = fetch("config.json", {cache:"no-cache"}).then(r => r.ok ? r.json() : {}).then(c => { WORKER = c.worker || ""; }).catch(() => {});
+  async function shareLive(e, via){   // ask the Cloudflare Worker to add this term to the shared base for everyone
+    await configReady; if(!WORKER || !canLive()) return null;
+    try{
+      const r = await fetch(WORKER, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({kind:e.t, q:e.n, name:via||e.n, en:e.en})});
+      return await r.json();
+    }catch{ return null; }
+  }
 
   /* ---------- not found: server discovery or Claude enrichment ---------- */
   function viewChoose(q, rows){
@@ -591,6 +600,7 @@ footer p{margin:0}
     if(canAI) $("#aiGo").onclick = () => enrich(kind, q);
     if(live){
       const steps = $("#liveSteps"), SRC = {PubMed:"PubMed", hackernews:"Hacker News", stackexchange:"Stack Exchange", lemmy:"Lemmy"};
+      let viaName = "";
       const run = async en => {
         $("#liveEdit").hidden = true; steps.innerHTML = Object.values(SRC).map(n => `<span class="chip" data-src="${n}">${n} …</span>`).join("");
         $("#liveTerm").innerHTML = `Αναζήτηση ως <b>${esc(en)}</b> · <button type="button" class="vlink" id="liveChange">αλλαγή όρου</button>`;
@@ -598,12 +608,13 @@ footer p{margin:0}
         try{
           const e = await liveSearch(kind, q, en, (src, n) => { const c = steps.querySelector(`[data-src="${SRC[src]||src}"]`); if(c) c.textContent = `${SRC[src]||src} ✓ ${n}`; });
           if(!e.auto.ps.length && !e.auto.fn){ $("#liveTerm").innerHTML = `Δεν βρέθηκαν αποτελέσματα για <b>${esc(en)}</b>. Δοκιμάστε άλλον όρο στα αγγλικά.`; $("#liveEdit").hidden = false; return; }
+          if(e.auto.ps.length >= 3 || e.auto.fn >= 20) shareLive(e, viaName).then(r => { if(r?.queued){ e.shared = true; const tg = document.querySelector(".result-head .tags"); if(tg && location.hash === `#${e.t}-${e.id}`) tg.insertAdjacentHTML("beforeend", `<span class="tag auto">Προστίθεται στην κοινή βάση</span>`); } });
           go(e.t, e.id);
         }catch{ $("#liveTerm").textContent = "Η ζωντανή αναζήτηση απέτυχε. Ελέγξτε τη σύνδεση."; $("#liveEdit").hidden = false; }
       };
       $("#liveGo").onclick = () => { const v = $("#enLive").value.trim(); if(/^[A-Za-z0-9 \-+'.,]{2,80}$/.test(v)) run(v); };
       (async () => {
-        try{ const {en, via} = await translate(q); if(en){ run(en); if(via) $("#liveTerm").insertAdjacentHTML("beforeend", ` <span class="r-n">(Wikipedia: ${esc(via)})</span>`); }
+        try{ const {en, via} = await translate(q); viaName = via; if(en){ run(en); if(via) $("#liveTerm").insertAdjacentHTML("beforeend", ` <span class="r-n">(Wikipedia: ${esc(via)})</span>`); }
           else { $("#liveTerm").textContent = "Δεν βρέθηκε αυτόματα ο αγγλικός όρος. Γράψτε τον παρακάτω:"; $("#liveEdit").hidden = false; } }
         catch{ $("#liveTerm").textContent = "Γράψτε τον όρο στα αγγλικά:"; $("#liveEdit").hidden = false; }
       })();

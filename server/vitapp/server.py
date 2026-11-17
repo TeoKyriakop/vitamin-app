@@ -117,21 +117,13 @@ class Handler(BaseHTTPRequestHandler):
         if time.time() - _last_discover["t"] < 5:
             return self._json(429, {"error": "Πολλά αιτήματα. Δοκιμάστε ξανά σε λίγα δευτερόλεπτα."})
         _last_discover["t"] = time.time()
-        disc = store.read_json(store.STATE / "discovered.json", []) or []
-        id_ = "d-" + store.slug(en)
-        if not any(d["id"] == id_ and d["t"] == kind for d in disc):
-            if len(disc) >= MAX_DISCOVERED:
-                return self._json(507, {"error": "Η βάση νέων αναζητήσεων είναι γεμάτη"})
-            cat = {"i": "Από αναζήτηση", "s": "Από αναζήτηση", "h": "Συνήθεια (από αναζήτηση)", "f": "Τροφή (από αναζήτηση)", "g": "Στόχος (από αναζήτηση)"}[kind]
-            disc.append({"t": kind, "id": id_, "n": q[:1].upper() + q[1:], "en": en, "k": [q, en], "cat": cat,
-                         "sum": "Νέα καταχώριση από αναζήτηση. Περιέχει μόνο αυτόματα αντλημένα δεδομένα.", "b": [], "u": [], "s": [], "f": [], "v": [],
-                     **({"doctor": True, "alert": "Αυτόματη καταχώριση χωρίς ιατρικό έλεγχο. Οι μελέτες και τα σχόλια μπορεί να αφορούν παρόμοια αλλά διαφορετική πάθηση. Μην ξεκινήσετε συμπλήρωμα χωρίς τον γιατρό σας."} if kind == "s" else {})})
-            store.write_json(store.STATE / "discovered.json", disc)
+        from . import discover_issue
         try:
             with work_lock:
-                ents = store.load_entities()
-                harvest.harvest_one(kind, id_, ents)
-                store.build_all()
+                kind, q, en = discover_issue.check(kind, q, en)
+                id_, _ = discover_issue.add(kind, q, en)
+        except ValueError as e:
+            return self._json(422, {"error": str(e)})
         except Exception as e:  # report, keep serving
             log.exception("discover failed")
             return self._json(502, {"error": f"Η άντληση απέτυχε: {e}"})

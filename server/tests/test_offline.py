@@ -87,12 +87,24 @@ class T(unittest.TestCase):
         with mock.patch.object(sources, "pubmed_search", return_value=[]), \
              mock.patch.object(sources, "europepmc_citations", return_value={}), \
              mock.patch.object(sources, "reddit_texts", return_value=POSTS), \
-             mock.patch.object(sources, "youtube_texts", return_value=[]), \
+             mock.patch.object(sources, "youtube_texts", return_value=POSTS * 5), \
              mock.patch.object(sources, "hackernews_texts", return_value=[]), \
              mock.patch.object(sources, "stackexchange_texts", return_value=[]), \
              mock.patch.object(sources, "lemmy_texts", return_value=[]):
             id_, a = discover_issue.add(k, q, en)
         self.assertTrue((Path(TMP) / f"app/data/e/h/{id_}.json").exists())
+        self.assertTrue((Path(TMP) / f"state/discovered/h/{id_}.json").exists())
+        # too little evidence: the term is not added to the shared base
+        with mock.patch.object(sources, "pubmed_search", return_value=[]), \
+             mock.patch.object(sources, "europepmc_search", return_value=[]), \
+             mock.patch.object(sources, "reddit_texts", return_value=[]), \
+             mock.patch.object(sources, "youtube_texts", return_value=POSTS), \
+             mock.patch.object(sources, "hackernews_texts", return_value=[]), \
+             mock.patch.object(sources, "stackexchange_texts", return_value=[]), \
+             mock.patch.object(sources, "lemmy_texts", return_value=[]):
+            with self.assertRaises(ValueError):
+                discover_issue.add("i", "Ανύπαρκτο", "nonexistent zzz")
+        self.assertFalse(list((Path(TMP) / "state/discovered/i").glob("*.json")))
         import shutil
         for f in ("index.html", "sw.js", "icon.svg", "manifest.webmanifest"):
             shutil.copy(Path(__file__).resolve().parents[2] / "app" / f, Path(TMP) / "app" / f)
