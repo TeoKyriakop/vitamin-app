@@ -1,0 +1,32 @@
+name: Διαγνωστικός έλεγχος (προσωρινό)
+on:
+  workflow_dispatch:
+    inputs:
+      field: {default: "#qI"}
+      q: {default: "Λουμπροκιναση"}
+permissions:
+  contents: read
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Πραγματικές απαντήσεις πηγών
+        run: |
+          curl -s "https://el.wikipedia.org/w/api.php?action=query&format=json&generator=search&gsrsearch=Λουμπροκιναση&gsrlimit=5&prop=langlinks|pageprops&lllang=en&redirects=1" | head -c 600; echo
+          curl -s "https://en.wikipedia.org/w/api.php?action=query&format=json&list=search&srsearch=lubrokinase&srlimit=5&srinfo=suggestion&srprop=" | head -c 600; echo
+          curl -s "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/espell.fcgi?db=pubmed&term=lubrokinase" | head -c 400; echo
+          curl -sI "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/espell.fcgi?db=pubmed&term=x" -H "Origin: https://teokyriakop.github.io" | grep -i access-control || echo "espell: no CORS header"
+      - name: Δοκιμή στον browser
+        run: |
+          npm i -s playwright@1.47.2 >/dev/null 2>&1 && npx playwright install --with-deps chromium >/dev/null 2>&1
+          cat > t.js <<'JS'
+          const {chromium}=require('playwright');(async()=>{const b=await chromium.launch();const p=await b.newPage();
+          p.on('console',m=>console.log('console:',m.type(),m.text()));p.on('pageerror',e=>console.log('PAGEERROR',e.message));
+          p.on('requestfailed',r=>console.log('FAILED',r.url().slice(0,120),r.failure()?.errorText));
+          p.on('response',r=>{const u=r.url();if(/wikipedia|eutils|europepmc|algolia|stackexchange|lemmy|workers/.test(u))console.log('resp',r.status(),u.slice(0,140));});
+          await p.goto('https://teokyriakop.github.io/vitamin-app/');await p.waitForTimeout(2000);
+          await p.fill(process.env.F,process.env.Q);await p.click(`form:has(${process.env.F}) .btn`);
+          for(const t of [1500,4000,8000,15000]){await p.waitForTimeout(t===1500?1500:t-1500);console.log(`--- ${t}ms hash=`+await p.evaluate(()=>location.hash));console.log((await p.textContent('#result')).replace(/\s+/g,' ').slice(0,500));}
+          await b.close();})();
+          JS
+          F='${{ inputs.field }}' Q='${{ inputs.q }}' node t.js
