@@ -84,7 +84,7 @@ class T(unittest.TestCase):
         for bad in ["kind: x\nq: a\nen: b c", "kind: h\nq: a\nen: $(rm -rf /)", "kind: h\nen: abc"]:
             with self.assertRaises(ValueError):
                 discover_issue.parse(bad)
-        with mock.patch.object(sources, "pubmed_search", return_value=[]), \
+        with mock.patch.object(sources, "pubmed_search", return_value=sources.parse_esummary(ESUMMARY)), \
              mock.patch.object(sources, "europepmc_citations", return_value={}), \
              mock.patch.object(sources, "reddit_texts", return_value=POSTS), \
              mock.patch.object(sources, "youtube_texts", return_value=POSTS * 5), \
@@ -103,7 +103,7 @@ class T(unittest.TestCase):
              mock.patch.object(sources, "stackexchange_texts", return_value=[]), \
              mock.patch.object(sources, "lemmy_texts", return_value=[]):
             with self.assertRaises(ValueError):
-                discover_issue.add("i", "Ανύπαρκτο", "nonexistent zzz")
+                discover_issue.add("i", "Ανύπαρκτο", "nonexistent zzz")   # comments only, no studies
         self.assertFalse(list((Path(TMP) / "state/discovered/i").glob("*.json")))
         import shutil
         for f in ("index.html", "sw.js", "icon.svg", "manifest.webmanifest"):

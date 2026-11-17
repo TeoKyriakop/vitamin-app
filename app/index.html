@@ -538,8 +538,20 @@ footer p{margin:0}
     }).join(" ");
   }
   const wikiApi = (lang, params) => getJSON(`https://${lang}.wikipedia.org/w/api.php?` + new URLSearchParams({format:"json", origin:"*", ...params}));
+  async function pubmedSpell(t){
+    try{
+      const c = new AbortController(); setTimeout(() => c.abort(), 8000);
+      const url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/espell.fcgi?" + new URLSearchParams({db:"pubmed", term:t, tool:"vitamin-compass"});
+      const xml = await (eutilsChain = eutilsChain.then(() => fetch(url, {signal:c.signal}).then(r => r.text())).catch(() => ""));
+      eutilsChain = eutilsChain.then(() => new Promise(r => setTimeout(r, 400)));
+      return (/<CorrectedQuery>([^<]*)<\/CorrectedQuery>/.exec(xml || "")?.[1] || "").trim();
+    }catch{ return ""; }
+  }
   async function translate(q){   // returns {en, via, guess}: guess=true when found by spelling/transliteration
-    if(!/[α-ωάέήίόύώϊϋΐΰ]/i.test(q)) return {en:q, via:"", guess:false};
+    if(!/[α-ωάέήίόύώϊϋΐΰ]/i.test(q)){   // English term: only fix obvious misspellings
+      const fixed = await pubmedSpell(q);
+      return fixed && norm(fixed) !== norm(q) && similar(fixed, q) >= 0.6 ? {en:fixed, via:"", guess:true} : {en:q, via:"", guess:false};
+    }
     // a) Greek Wikipedia article whose title resembles the query, through its English language link
     try{
       const j = await wikiApi("el", {action:"query", generator:"search", gsrsearch:q, gsrlimit:"5", prop:"langlinks|pageprops", lllang:"en", redirects:"1"});
@@ -555,14 +567,8 @@ footer p{margin:0}
       const best = cands.map(c => [c, similar(c, t)]).sort((a,b) => b[1]-a[1])[0];
       if(best && best[1] >= 0.6) return {en: best[0], via: "", guess:true};
     }catch{}
-    try{   // PubMed's own spelling correction (e.g. lubrokinase -> lumbrokinase)
-      const c = new AbortController(); setTimeout(() => c.abort(), 8000);
-      const url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/espell.fcgi?" + new URLSearchParams({db:"pubmed", term:t, tool:"vitamin-compass"});
-      const xml = await (eutilsChain = eutilsChain.then(() => fetch(url, {signal:c.signal}).then(r => r.text())).catch(() => ""));
-      eutilsChain = eutilsChain.then(() => new Promise(r => setTimeout(r, 400)));
-      const fixed = (/<CorrectedQuery>([^<]*)<\/CorrectedQuery>/.exec(xml)?.[1] || "").trim();
-      if(fixed && similar(fixed, t) >= 0.6) return {en: fixed, via: "", guess:true};
-    }catch{}
+    const fixed = await pubmedSpell(t);   // PubMed's own spelling correction (e.g. lubrokinase -> lumbrokinase)
+    if(fixed && similar(fixed, t) >= 0.6) return {en: fixed, via: "", guess:true};
     return t.length >= 3 ? {en: t, via: "", guess:true} : {en:"", via:"", guess:false};   // search with the transliteration
   }
   const STUDY = '(meta-analysis[pt] OR systematic review[pt] OR randomized controlled trial[pt] OR clinical trial[pt]) NOT (animals[mh] NOT humans[mh])';
@@ -694,7 +700,7 @@ footer p{margin:0}
         try{
           const e = await liveSearch(kind, q, en, (src, n) => { const c = steps.querySelector(`[data-src="${SRC[src]||src}"]`); if(c) c.textContent = `${SRC[src]||src} ✓ ${n}`; });
           if(!e.auto.ps.length && !e.auto.po.length && !e.auto.fn){ liveDone(); $("#liveTerm").innerHTML = `Δεν βρέθηκαν αποτελέσματα για <b>${esc(en)}</b>. Δοκιμάστε άλλον όρο στα αγγλικά.`; $("#liveEdit").hidden = false; return; }
-          if(e.auto.ps.length >= 3 || e.auto.fn >= 20) shareLive(e, viaName).then(r => { if(r?.queued){ e.shared = true; const tg = document.querySelector(".result-head .tags"); if(tg && location.hash === `#${e.t}-${e.id}`) tg.insertAdjacentHTML("beforeend", `<span class="tag auto">Προστίθεται στην κοινή βάση</span>`); } });
+          if(e.auto.ps.length + e.auto.po.length >= 3) shareLive(e, viaName).then(r => { if(r?.queued){ e.shared = true; const tg = document.querySelector(".result-head .tags"); if(tg && location.hash === `#${e.t}-${e.id}`) tg.insertAdjacentHTML("beforeend", `<span class="tag auto">Προστίθεται στην κοινή βάση</span>`); } });
           go(e.t, e.id);
         }catch{ liveDone(); $("#liveTerm").textContent = "Η αναζήτηση απέτυχε. Ελέγξτε τη σύνδεση."; $("#liveEdit").hidden = false; }
       };

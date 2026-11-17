@@ -44,10 +44,10 @@ def add(kind, q, en):
         entry.update(doctor=True, alert="Αυτόματη καταχώριση χωρίς ιατρικό έλεγχο. Οι μελέτες και τα σχόλια μπορεί να αφορούν παρόμοια αλλά διαφορετική πάθηση. Μην ξεκινήσετε συμπλήρωμα χωρίς τον γιατρό σας.")
     store.write_json(path, entry)
     a = harvest.harvest_one(kind, id_, store.load_entities())
-    if len(a.get("ps", [])) < MIN_STUDIES and a.get("fn", 0) < MIN_TEXTS:   # too little evidence: not shared
+    if len(a.get("ps", [])) + len(a.get("po", [])) < MIN_STUDIES:   # needs real studies, comments alone are not enough
         path.unlink(missing_ok=True)
         store.auto_path(kind, id_).unlink(missing_ok=True)
-        raise ValueError(f"Βρέθηκαν πολύ λίγα δεδομένα για το «{en}», οπότε δεν προστέθηκε.")
+        raise ValueError(f"Βρέθηκαν λιγότερες από {MIN_STUDIES} μελέτες για το «{en}», οπότε δεν προστέθηκε.")
     store.build_all()
     return id_, a
 
