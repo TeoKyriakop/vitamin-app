@@ -260,6 +260,18 @@ footer p{margin:0}
   const allRows = () => [...INDEX, ...[...extra.values()].map(e => [e.t, e.id, e.n, e.cat||"", norm([e.n,e.en,...(e.k||[])].join(" ")), e.src||"ai"])];
   const STOP = new Set(["θελω","να","εχω","για","την","τον","του","της","των","πιο","μου","με","και","σε","στο","στη","στην","απο","καλυτερο","καλυτερη","καλυτερα","βελτιωση","προβλημα","the","and","for","with"]);
   const stem = w => w.slice(0, Math.max(4, w.length - 2));
+  // Spelling-tolerant form: ignores double letters and Greek letters that sound the same (ι/η/υ/ει/οι, ο/ω, ε/αι)
+  const phon = s => norm(s).replace(/ει|οι|υι/g,"ι").replace(/[ηυ]/g,"ι").replace(/ω/g,"ο").replace(/αι/g,"ε")
+    .replace(/([^\sγ])\1+/g,"$1").replace(/ph/g,"f").replace(/y/g,"i").replace(/c(?=[aou])/g,"k");
+  const phonCache = new Map();
+  const phonKw = row => { let v = phonCache.get(row); if(v === undefined){ v = " " + phon(row[2] + " " + row[4]) + " "; phonCache.set(row, v); } return v; };
+  function lev(a, b){   // edit distance, small strings only
+    if(Math.abs(a.length - b.length) > 3) return 9;
+    let prev = Array.from({length:b.length+1}, (_, j) => j);
+    for(let i = 1; i <= a.length; i++){ const cur = [i]; for(let j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j]+1, cur[j-1]+1, prev[j-1] + (a[i-1] === b[j-1] ? 0 : 1)); prev = cur; }
+    return prev[b.length];
+  }
+  const similar = (a, b) => { a = phon(a); b = phon(b); const d = lev(a, b); return 1 - d / Math.max(a.length, b.length, 1); };
   function score(q, row){
     // full = every meaningful word of the query is found; partial matches never open an entry by themselves
     const nq = norm(q); if(!nq) return {s:0, full:false};
@@ -269,9 +281,23 @@ footer p{margin:0}
     if(nn.startsWith(nq + " ") || nn.startsWith(nq)) return {s:80, full:true};
     const words = nq.split(" ").filter(w => w.length > 2 && !STOP.has(w));
     if(!words.length) return {s:0, full:false};
-    const hit = words.filter(w => kw.includes(stem(w)) || nn.includes(stem(w)));
+    const pk = phonKw(row);
+    if(phon(row[2]) === phon(nq)) return {s:95, full:true};
+    if(pk.includes(" " + phon(nq) + " ")) return {s:88, full:true};   // same term, different spelling
+    const hit = words.filter(w => kw.includes(stem(w)) || nn.includes(stem(w)) || pk.includes(stem(phon(w))));
     const full = hit.length === words.length;
     return {s: full ? 60 + Math.min(20, 3*words.length) : 25 * hit.length / words.length, full};
+  }
+  function didYouMean(q, types){   // close spellings of single words (1 typo per ~5 letters)
+    const words = phon(q).split(" ").filter(w => w.length >= 4 && !STOP.has(w)); if(!words.length) return [];
+    const out = [];
+    for(const r of allRows()){
+      if(!types.includes(r[0])) continue;
+      const tokens = phonKw(r).trim().split(" ");
+      const ok = words.every(w => tokens.some(t => t.length >= 4 && lev(w, t) <= Math.max(1, Math.floor(w.length / 5))));
+      if(ok) out.push(r);
+    }
+    return out.slice(0, 5);
   }
   function faqSearch(q, limit=6){
     const words = norm(q).split(" ").filter(w => w.length > 2 && !STOP.has(w));
@@ -305,7 +331,7 @@ footer p{margin:0}
   const rankList = (rows, empty) => rows.length ? `<ol class="rank">${rows.map((h,i)=>`<li><span class="pos">${i+1}</span><div>${h}</div></li>`).join("")}</ol>` : `<p class="r-n">${empty||"Δεν υπάρχουν ακόμη δεδομένα."}</p>`;
   const graded = (g, main, note) => `<span class="grade g-${esc(g)}">${esc(g)}</span>${main}${note?`<div class="r-n">${esc(note)}</div>`:""}`;
   const byGrade = arr => arr.slice().sort((a,b)=>(GRADE[b[1]]||0)-(GRADE[a[1]]||0));
-  const rankOf = t => /μετα-ανάλυση|cochrane|συστηματική|ομπρέλα/i.test(t[3]+t[2]) ? 0 : /rct/i.test(t[3]) ? 1 : 2;
+  const rankOf = t => /μετα-ανάλυση|cochrane|συστηματική|ομπρέλα/i.test(t[3]+t[2]) ? 0 : /^rct/i.test(t[3]) ? 1 : 2;
   const sortStudies = arr => arr.slice().sort((a,b) => rankOf(a)-rankOf(b) || (+b[1]||0)-(+a[1]||0));
 
   function studyCard(s, verify){
@@ -496,22 +522,44 @@ footer p{margin:0}
   const strip = h => { const d = document.createElement("div"); d.innerHTML = String(h||"").replace(/<[^>]+>/g," "); return d.textContent.replace(/\s+/g," ").trim(); };
   const getJSON = async (url, ms=12000) => { const c = new AbortController(); const t = setTimeout(()=>c.abort(), ms); try{ const r = await fetch(url, {signal:c.signal}); if(!r.ok) throw new Error(r.status); return await r.json(); } finally{ clearTimeout(t); } };
 
-  async function translate(q){   // Greek term -> English medical term via Wikipedia's language links
-    if(!/[α-ωάέήίόύώϊϋΐΰ]/i.test(q)) return {en:q, via:""};
-    const u = "https://el.wikipedia.org/w/api.php?" + new URLSearchParams({action:"query", format:"json", origin:"*", generator:"search", gsrsearch:q, gsrlimit:"3", prop:"langlinks|pageprops", lllang:"en", redirects:"1"});
-    const j = await getJSON(u);
-    const pages = Object.values(j.query?.pages||{}).sort((a,b)=>a.index-b.index).filter(p => !("disambiguation" in (p.pageprops||{})));
-    const pg = pages.find(p => p.langlinks?.length);
-    return pg ? {en: pg.langlinks[0]["*"], via: pg.title} : {en:"", via:""};
+  // Greek medical word endings and letters -> Latin, so a misspelled or rare term can still be found
+  const SUFFIX = [["ιτιδα","itis"],["ιτιδες","itis"],["ωση","osis"],["αση","ase"],["ιαση","iasis"],["ινη","ine"],["ολη","ol"],["ισμος","ism"],["ια","ia"],["ιο","ium"],["ος","os"]];
+  const LETTERS = {α:"a",β:"b",γ:"g",δ:"d",ε:"e",ζ:"z",η:"i",θ:"th",ι:"i",κ:"k",λ:"l",μ:"m",ν:"n",ξ:"x",ο:"o",π:"p",ρ:"r",σ:"s",τ:"t",υ:"y",φ:"ph",χ:"ch",ψ:"ps",ω:"o"};
+  function translit(q){
+    return norm(q).split(" ").map(w => {
+      let end = ""; for(const [g, l] of SUFFIX){ if(w.length > g.length + 2 && w.endsWith(g)){ w = w.slice(0, -g.length); end = l; break; } }
+      w = w.replace(/ου/g,"u").replace(/μπ/g,"b").replace(/ντ/g,"d").replace(/γγ/g,"ng").replace(/γκ/g,"g").replace(/αυ/g,"av").replace(/ευ/g,"ev");
+      return [...w].map(c => LETTERS[c] ?? c).join("") + end;
+    }).join(" ");
   }
-  const STUDY = '(meta-analysis[pt] OR systematic review[pt] OR randomized controlled trial[pt]) NOT (animals[mh] NOT humans[mh])';
+  const wikiApi = (lang, params) => getJSON(`https://${lang}.wikipedia.org/w/api.php?` + new URLSearchParams({format:"json", origin:"*", ...params}));
+  async function translate(q){   // returns {en, via, guess}: guess=true when found by spelling/transliteration
+    if(!/[α-ωάέήίόύώϊϋΐΰ]/i.test(q)) return {en:q, via:"", guess:false};
+    // a) Greek Wikipedia article whose title resembles the query, through its English language link
+    try{
+      const j = await wikiApi("el", {action:"query", generator:"search", gsrsearch:q, gsrlimit:"5", prop:"langlinks|pageprops", lllang:"en", redirects:"1"});
+      const pages = Object.values(j.query?.pages||{}).sort((a,b)=>a.index-b.index).filter(p => !("disambiguation" in (p.pageprops||{})) && p.langlinks?.length);
+      const pg = pages.find(p => similar(p.title, q) >= 0.6 || phon(p.title).includes(phon(q)) || phon(q).includes(phon(p.title)));
+      if(pg) return {en: pg.langlinks[0]["*"], via: pg.title, guess:false};
+    }catch{}
+    // b) medical transliteration, corrected by English Wikipedia's spelling suggestions
+    const t = translit(q);
+    try{
+      const j = await wikiApi("en", {action:"query", list:"search", srsearch:t, srlimit:"5", srinfo:"suggestion", srprop:""});
+      const cands = [j.query?.searchinfo?.suggestion, ...(j.query?.search||[]).map(x => x.title)].filter(Boolean);
+      const best = cands.map(c => [c, similar(c, t)]).sort((a,b) => b[1]-a[1])[0];
+      if(best && best[1] >= 0.6) return {en: best[0], via: "", guess:true};
+    }catch{}
+    return {en:"", via:"", guess:false};
+  }
+  const STUDY = '(meta-analysis[pt] OR systematic review[pt] OR randomized controlled trial[pt] OR clinical trial[pt]) NOT (animals[mh] NOT humans[mh])';
   async function livePubmed(term){
     const base = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/";
     const s = await getJSON(base + "esearch.fcgi?" + new URLSearchParams({db:"pubmed", retmode:"json", retmax:"20", sort:"relevance", tool:"vitamin-compass", term:`(${term}) AND ${STUDY}`}));
     const ids = s.esearchresult?.idlist || []; if(!ids.length) return [];
     const j = await getJSON(base + "esummary.fcgi?" + new URLSearchParams({db:"pubmed", retmode:"json", tool:"vitamin-compass", id:ids.join(",")}));
     const out = ids.map(id => { const d = j.result?.[id] || {}; const pt = (d.pubtype||[]).map(x=>x.toLowerCase());
-      const type = pt.includes("meta-analysis") ? "Μετα-ανάλυση" : pt.includes("systematic review") ? "Συστηματική ανασκόπηση" : pt.includes("randomized controlled trial") ? "RCT" : "Μελέτη";
+      const type = pt.includes("meta-analysis") ? "Μετα-ανάλυση" : pt.includes("systematic review") ? "Συστηματική ανασκόπηση" : pt.includes("randomized controlled trial") ? "RCT" : pt.includes("clinical trial") ? "Κλινική μελέτη" : "Μελέτη";
       return [id, (d.title||"").replace(/\.$/,""), (d.pubdate||"").slice(0,4), d.source||"", type, 0, d.authors?.[0]?.name||""]; });
     try{
       const q = "(" + ids.map(i=>"EXT_ID:"+i).join(" OR ") + ") AND SRC:MED";
@@ -519,7 +567,7 @@ footer p{margin:0}
       const m = Object.fromEntries((c.resultList?.result||[]).map(x => [x.pmid, +x.citedByCount||0]));
       out.forEach(r => r[5] = m[r[0]] || 0);
     }catch{}
-    const rank = {"Μετα-ανάλυση":0, "Συστηματική ανασκόπηση":1, "RCT":2};
+    const rank = {"Μετα-ανάλυση":0, "Συστηματική ανασκόπηση":1, "RCT":2, "Κλινική μελέτη":3};
     return out.sort((a,b) => (rank[a[4]]??3) - (rank[b[4]]??3) || b[5]-a[5]).slice(0,15);
   }
   const SE_SITES = {i:["fitness","medicalsciences"], s:["medicalsciences","fitness"], h:["fitness","medicalsciences"], f:["cooking","fitness"]};
@@ -625,7 +673,7 @@ footer p{margin:0}
         const h = document.querySelector("#result .eyebrow"); if(h) h.textContent = "Νέα αναζήτηση"; const sub = document.querySelector("#result .result-head .sub"); if(sub) sub.textContent = "Δεν βρέθηκαν αρκετά δεδομένα για αυτόν τον όρο."; };
       $("#liveGo").onclick = () => { const v = $("#enLive").value.trim(); if(/^[A-Za-z0-9 \-+'.,]{2,80}$/.test(v)) run(v); };
       (async () => {
-        try{ const {en, via} = await translate(q); viaName = via; if(en){ run(en); if(via) $("#liveTerm").insertAdjacentHTML("beforeend", ` <span class="r-n">(Wikipedia: ${esc(via)})</span>`); }
+        try{ const {en, via, guess} = await translate(q); viaName = via; if(en){ run(en); if(via) $("#liveTerm").insertAdjacentHTML("beforeend", ` <span class="r-n">(Wikipedia: ${esc(via)})</span>`); else if(guess) $("#liveTerm").insertAdjacentHTML("beforeend", ` <span class="r-n">(εκτίμηση από την ορθογραφία, ελέγξτε ότι είναι σωστό)</span>`); }
           else { liveDone(); $("#liveTerm").textContent = "Δεν βρέθηκε αυτόματα ο αγγλικός όρος. Γράψτε τον παρακάτω:"; $("#liveEdit").hidden = false; } }
         catch{ liveDone(); $("#liveTerm").textContent = "Γράψτε τον όρο στα αγγλικά:"; $("#liveEdit").hidden = false; }
       })();
@@ -689,7 +737,16 @@ footer p{margin:0}
     if(goals.length === 1) return go(goals[0].r[0], goals[0].r[1]);
     history.replaceState(null, "", location.pathname + location.search);
     if(close.length >= 2) viewChoose(q, close.map(x => x.r));
-    else viewMissing(types, q, partial.map(x => x.r));
+    else {
+      const dym = didYouMean(q, types);
+      if(dym.length === 1 && similar(dym[0][2], q) >= 0.8) return go(dym[0][0], dym[0][1]);   // obvious typo of a single entry
+      if(dym.length){
+        $("#result").innerHTML = `<div class="result-head"><div><div class="eyebrow">Μήπως εννοείτε;</div><h2>«${esc(q)}»</h2><p class="sub">Βρέθηκαν καταχωρίσεις με παρόμοια ορθογραφία.</p></div></div>
+          <div class="panes" style="grid-template-columns:1fr"><article class="pane"><div class="pane-b">${rankList(dym.map(r => `${link(r[0], r[1], r[2])}<div class="r-n">${esc(TYPE_LABEL[r[0]])}</div>`))}
+          <div><button class="btn" type="button" id="dymNo" style="--c:var(--indigo)">Όχι, αναζήτησε «${esc(q)}» στις πηγές</button></div></div></article></div>`;
+        $("#dymNo").onclick = () => viewMissing(types, q, partial.map(x => x.r));
+      } else viewMissing(types, q, partial.map(x => x.r));
+    }
     $("#result").scrollIntoView({behavior:"smooth"});
   }));
   window.addEventListener("hashchange", () => route(true));

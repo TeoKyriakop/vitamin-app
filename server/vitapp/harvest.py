@@ -53,7 +53,7 @@ def harvest_one(t, id_, ents):
     if studies is None:
         auto["ps"], auto["lit"] = prev.get("ps", []), prev.get("lit", [])
     else:
-        rank = {"Μετα-ανάλυση": 0, "Συστηματική ανασκόπηση": 1, "RCT": 2}
+        rank = {"Μετα-ανάλυση": 0, "Συστηματική ανασκόπηση": 1, "RCT": 2, "Κλινική μελέτη": 3}
         studies.sort(key=lambda s: (rank.get(s["type"], 3), -s.get("cites", 0)))
         auto["ps"] = [[s["pmid"], s["title"], s["year"], s["journal"], s["type"], s.get("cites", 0), s["author"]] for s in studies[:15]]
         auto["lit"] = [[r[0], r[1]] for r in lexicon.tally([s["title"] for s in studies]) if r[1] >= 2][:8]

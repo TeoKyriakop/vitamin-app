@@ -70,7 +70,7 @@ def _get(url, headers=None, data=None, tries=3, timeout=25):
 
 # ---------------------------------------------------------------- PubMed
 EUTILS = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/"
-STUDY_FILTER = ('(meta-analysis[pt] OR systematic review[pt] OR randomized controlled trial[pt]) '
+STUDY_FILTER = ('(meta-analysis[pt] OR systematic review[pt] OR randomized controlled trial[pt] OR clinical trial[pt]) '
                 'NOT (animals[mh] NOT humans[mh])')
 
 
@@ -106,6 +106,8 @@ def parse_esummary(summ):
             kind = "Συστηματική ανασκόπηση"
         elif "randomized controlled trial" in pts:
             kind = "RCT"
+        elif "clinical trial" in pts:
+            kind = "Κλινική μελέτη"
         else:
             kind = "Μελέτη"
         authors = d.get("authors") or []

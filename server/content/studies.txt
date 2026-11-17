@@ -1,0 +1,5 @@
+# Επιμελημένες μελέτες για καταχωρίσεις του content (προστίθενται στο παράθυρο «Μελέτες»)
+# τύπος | id | συγγραφέας | έτος | περιοδικό | τύπος μελέτης | n | εύρημα | όροι PubMed
+i | nattokinase | Chen H, McGowan EM, Ren N | 2022 | Front Cardiovasc Med | Ανοιχτή κλινική μελέτη (χωρίς ομάδα ελέγχου) | 1.062 | 10.800 FU την ημέρα για 12 μήνες συνδέθηκαν με μείωση του μεγέθους της πλάκας στις καρωτίδες και του πάχους του έσω-μέσου χιτώνα, και βελτίωση λιπιδίων. Χωρίς ομάδα σύγκρισης. | Chen 2022 nattokinase atherosclerosis hyperlipidemia 1062 participants
+i | nattokinase | Hodis HN, Mack WJ | 2021 | Clin Hemorheol Microcirc | RCT | 265 | Η νατοκινάση για 3 χρόνια δεν επιβράδυνε την εξέλιξη της υποκλινικής αθηροσκλήρωσης (πάχος καρωτίδας) ούτε την αρτηριακή σκληρία σε σύγκριση με εικονικό φάρμακο (NAPS). | Hodis 2021 nattokinase atherothrombotic prevention study randomized
+i | nattokinase | Kim JY | 2008 | Hypertens Res | RCT | 86 | Μικρή μείωση της αρτηριακής πίεσης σε 8 εβδομάδες σε άτομα με υψηλή φυσιολογική πίεση ή υπέρταση σταδίου 1. | Kim 2008 nattokinase blood pressure randomized hypertension

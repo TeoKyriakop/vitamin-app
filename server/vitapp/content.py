@@ -8,6 +8,7 @@ symptoms.txt  id | name | english | keywords | doctor(0/1) | alert | helps | avo
 habits.txt    id | name | english | keywords | category | summary | benefits | steps | warning
 foods.txt     id | name | english | keywords | summary | benefits | how-to | nutrients(item ids, comma) | warning
 faq.txt       id | question | keywords | answer | grade | links(t:id, comma)
+studies.txt   type | id | author | year | journal | study type | n | finding | pubmed terms
 
 benefits:  text~grade~note        forms/steps/foods: what~amount~note
 helps:     item_id~grade~why      avoid: what~why~item_id   not-to-confuse: symptom_id~name~why
@@ -76,6 +77,13 @@ def parse():
     for f in _rows("faq.txt", 6):
         out["faq"].append({"id": f[0], "n": f[1], "k": kw(f[2]), "a": f[3], "g": f[4] if f[4] in "ABC" and f[4] else "",
                            "links": [x.strip().split(":", 1) for x in f[5].split(",") if ":" in x], "cat": "Συχνή ερώτηση"})
+    key = {"i": "items", "s": "symptoms", "h": "habits", "f": "foods"}
+    for f in _rows("studies.txt", 9):
+        tgt = next((e for e in out.get(key.get(f[0], ""), []) if e["id"] == f[1]), None)
+        if tgt is None:
+            out.setdefault("extra_studies", []).append(f)   # study for a seed (non-content) entry
+        else:
+            tgt["s"].append(f[2:9])
     return out
 
 
@@ -103,6 +111,7 @@ def validate(c):
         errs += [f"f/{e['id']}: άγνωστο θρεπτικό {x}" for x in e["nut"] if x not in ids["i"]]
     for e in c["faq"]:
         errs += [f"q/{e['id']}: άγνωστος σύνδεσμος {t}:{i}" for t, i in e["links"] if i not in ids.get(t, ())]
+    errs += [f"studies: άγνωστη καταχώριση {f[0]}/{f[1]}" for f in c.get("extra_studies", []) if (f[0], f[1]) not in base]
     if errs:
         raise ValueError("\n".join(errs))
 
