@@ -116,6 +116,10 @@ ol.rank li > div{min-width:0}
 .alert.big{margin-top:12px;font-size:.98rem;padding:12px 16px}
 .tag.doc{background:var(--berry-soft);color:var(--berry)}
 .pos.no{background:var(--berry-soft);color:var(--berry);border-color:transparent}
+.storage{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;font-size:.85rem}
+.storage select{padding:4px 8px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+.live-steps{display:flex;flex-wrap:wrap;gap:6px}
+.live-edit{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .ai-box{background:var(--indigo-soft);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
 .ai-box .btn{--c:var(--indigo)}
 .ai-box input{padding:9px 12px;border-radius:12px;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);min-width:0;width:100%;max-width:340px}
@@ -166,6 +170,13 @@ footer p{margin:0}
 
   <section id="result" aria-live="polite"><p class="loading">Φόρτωση βάσης…</p></section>
 
+  <section class="storage" aria-label="Αποθήκευση">
+    <span id="stUse" class="r-n">Αποθηκευμένα στη συσκευή: …</span>
+    <label for="stCap" class="r-n">Μέγιστος χώρος</label>
+    <select id="stCap"></select>
+    <button type="button" class="chip" id="stClear">Διαγραφή αποθηκευμένων</button>
+  </section>
+
   <footer>
     <p><b>Σημαντικό:</b> Οι πληροφορίες είναι ενημερωτικές και δεν αντικαθιστούν ιατρική συμβουλή. Πριν ξεκινήσετε συμπλήρωμα ή μεγάλη αλλαγή στη διατροφή ή την άσκηση, ειδικά με φάρμακα, εγκυμοσύνη ή χρόνια νόσο, συμβουλευτείτε γιατρό ή φαρμακοποιό.</p>
     <p><b>Βαθμοί τεκμηρίωσης:</b> A = ισχυρή (μεγάλα RCT ή μετα-αναλύσεις), B = μέτρια, C = ασθενής, μικτή ή αρνητική. Οι εμπειρίες χρηστών είναι ανέκδοτες: δείχνουν τι επαναλαμβάνεται συχνά, όχι τι είναι αποδεδειγμένο.</p>
@@ -189,35 +200,51 @@ footer p{margin:0}
   let MODE = "static", db = null, sample = null;
   const REPO = (document.querySelector('meta[name="vc-repo"]')?.content || "").replace(/[^\w.\-\/]/g, "");
 
-  /* ---------- small on-device cache: keeps phones light ---------- */
-  const CACHE_PREFIX = "vc:e:", CACHE_MAX = 1200000;  // ~1.2 MB of entries at most
-  function cacheGet(key, hash){
-    try{ const raw = localStorage.getItem(CACHE_PREFIX+key); if(!raw) return null;
-      const o = JSON.parse(raw); if(o.h !== hash) return null;
-      o.at = Date.now(); localStorage.setItem(CACHE_PREFIX+key, JSON.stringify(o)); return o.d; }catch{ return null; }
-  }
-  function cachePut(key, hash, d){
+  /* ---------- on-device storage (IndexedDB), size chosen by the user ---------- */
+  const CAP_KEY = "vc:capMB", CAPS = [25, 50, 100, 250, 500];
+  let capMB = 100; try{ capMB = +localStorage.getItem(CAP_KEY) || 100; }catch{}
+  let idb = null;
+  const idbReady = new Promise(res => {
     try{
-      const val = JSON.stringify({h:hash, at:Date.now(), d});
-      const items = []; let total = val.length;
-      for(let i=0;i<localStorage.length;i++){ const k = localStorage.key(i); if(k && k.startsWith(CACHE_PREFIX) && k !== CACHE_PREFIX+key){ const v = localStorage.getItem(k)||""; total += v.length; let at=0; try{at=JSON.parse(v).at||0}catch{} items.push([k,v.length,at]); } }
-      items.sort((a,b)=>a[2]-b[2]);
-      while(total > CACHE_MAX && items.length){ const [k,len] = items.shift(); localStorage.removeItem(k); total -= len; }
-      localStorage.setItem(CACHE_PREFIX+key, val);
-    }catch{}
+      const rq = indexedDB.open("vitamin-compass", 1);
+      rq.onupgradeneeded = () => { const d = rq.result; d.createObjectStore("entries", {keyPath:"k"}); d.createObjectStore("live", {keyPath:"k"}); };
+      rq.onsuccess = () => { idb = rq.result; res(idb); };
+      rq.onerror = rq.onblocked = () => res(null);
+    }catch{ res(null); }
+  });
+  const tx = (store, mode, fn) => idbReady.then(d => d ? new Promise((res, rej) => {
+    const t = d.transaction(store, mode), st = t.objectStore(store); let out; const r = fn(st);
+    if(r) r.onsuccess = () => { out = r.result; }; t.oncomplete = () => res(out); t.onerror = () => rej(t.error);
+  }).catch(() => null) : null);
+  const cacheGet = async (key, hash) => { const o = await tx("entries", "readonly", st => st.get(key)); if(!o || o.h !== hash) return null; o.at = Date.now(); tx("entries", "readwrite", st => st.put(o)); return o.d; };
+  async function cachePut(key, hash, d){
+    const size = JSON.stringify(d).length * 2;
+    await tx("entries", "readwrite", st => st.put({k:key, h:hash, at:Date.now(), size, d}));
+    trimStore();
+  }
+  async function storeUsage(){
+    let total = 0, n = 0;
+    for(const name of ["entries","live"]){ const all = await tx(name, "readonly", st => st.getAll()) || []; for(const o of all){ total += o.size||0; n++; } }
+    return {total, n};
+  }
+  async function trimStore(){   // drop the least recently opened cached entries above the cap; live searches are kept longest
+    const all = (await tx("entries", "readonly", st => st.getAll())) || [];
+    let {total} = await storeUsage(); const cap = capMB * 1048576;
+    all.sort((x,y) => x.at - y.at);
+    for(const o of all){ if(total <= cap) break; await tx("entries", "readwrite", st => st.delete(o.k)); total -= o.size||0; }
   }
   async function getEntry(t, id){
     const key = t+"/"+id;
     if(extra.has(key)) return extra.get(key);
     if(memo.has(key)) return memo.get(key);
     const row = INDEX.find(r => r[0]===t && r[1]===id); if(!row) return null;
-    let d = cacheGet(key, row[5]);
+    let d = await cacheGet(key, row[5]);
     if(!d){ const r = await fetch(`data/e/${t}/${encodeURIComponent(id)}.json`); if(!r.ok) return null; d = await r.json(); cachePut(key, row[5], d); }
     memo.set(key, d); return d;
   }
 
   /* ---------- search ---------- */
-  const allRows = () => [...INDEX, ...[...extra.values()].map(e => [e.t, e.id, e.n, e.cat||"", norm([e.n,e.en,...(e.k||[])].join(" ")), "ai"])];
+  const allRows = () => [...INDEX, ...[...extra.values()].map(e => [e.t, e.id, e.n, e.cat||"", norm([e.n,e.en,...(e.k||[])].join(" ")), e.src||"ai"])];
   const STOP = new Set(["θελω","να","εχω","για","την","τον","του","της","των","πιο","μου","με","και","σε","στο","στη","στην","απο","καλυτερο","καλυτερη","καλυτερα","βελτιωση","προβλημα","the","and","for","with"]);
   const stem = w => w.slice(0, Math.max(4, w.length - 2));
   function score(q, row){
@@ -293,8 +320,9 @@ footer p{margin:0}
   function head(e){
     const tags = [`<span class="tag">${esc(TYPE_LABEL[e.t])}</span>`];
     if(e.doctor) tags.push(`<span class="tag doc">Μόνο με γιατρό</span>`);
+    if(e.src === "live") tags.push(`<span class="tag auto">Ζωντανή αναζήτηση · ${esc(e.auto?.upd||"")}</span>`);
     if(e.src === "ai") tags.push(`<span class="tag ai">Εμπλουτισμός Claude · ${esc(e.date||"")}</span>`);
-    if(e.auto?.upd) tags.push(`<span class="tag auto">Αυτόματη ενημέρωση · ${esc(e.auto.upd)}</span>`);
+    if(e.auto?.upd && e.src !== "live") tags.push(`<span class="tag auto">Αυτόματη ενημέρωση · ${esc(e.auto.upd)}</span>`);
     return `<div class="result-head"><div><div class="eyebrow">${esc(e.cat||TYPE_LABEL[e.t])}</div><h2>${esc(e.n)}</h2>${e.sum?`<p class="sub">${esc(e.sum)}</p>`:""}</div><div class="tags">${tags.join("")}</div></div>`;
   }
 
@@ -391,12 +419,109 @@ footer p{margin:0}
     $("#result").innerHTML = t==="s" ? viewSymptom(e) : t==="g" ? viewGoal(e) : viewSubstance(e);
     const input = {i:"#qI", s:"#qS"}[t] || "#qL"; $(input).value = e.n;
     if(scroll) $("#result").scrollIntoView({behavior:"smooth", block:"start"});
+    showUsage();
   }
   function route(scroll){
     const m = /^#([ishfg])-(.+)$/.exec(location.hash);
     if(m) show(m[1], decodeURIComponent(m[2]), scroll);
   }
   const go = (t, id) => { const h = `#${t}-${id}`; if(location.hash === h) route(true); else location.hash = h; };
+
+  /* ---------- live search: the phone itself asks PubMed, Europe PMC and open forums ---------- */
+  const OUTCOMES = [
+    ["Ύπνος", /\b(sleep\w*|insomnia|fell asleep|falling asleep|slept)\b/i, 0], ["Άγχος / ηρεμία", /\b(anxi\w+|calm\w*|stress\w*|panic)\b/i, 0],
+    ["Ενέργεια / κόπωση", /\b(energy|energi\w+|fatigue\w*|tired\w*|exhaust\w*|letharg\w*)\b/i, 0], ["Διάθεση", /\b(mood|depress\w*|happier|motivation)\b/i, 0],
+    ["Συγκέντρωση / μνήμη", /\b(focus\w*|concentrat\w+|brain fog|clarity|memory|cogniti\w+)\b/i, 0], ["Κράμπες / σπασμοί", /\b(cramp\w*|twitch\w*|spasm\w*)\b/i, 0],
+    ["Πονοκέφαλος / ημικρανία", /\b(headache\w*|migraine\w*)\b/i, 0], ["Πέψη / φούσκωμα", /\b(bloat\w*|digest\w*|constipat\w+|gut|bowel\w*)\b/i, 0],
+    ["Διάρροια", /\b(diarrh\w+|loose stool\w*|laxative)\b/i, 1], ["Ναυτία / ενόχληση στομάχου", /\b(nause\w+|upset stomach|stomach (ache|upset|pain))\b/i, 1],
+    ["Δέρμα / ακμή", /\b(skin|acne|pimple\w*|breakout\w*|complexion)\b/i, 0], ["Μαλλιά", /\bhair\b/i, 0], ["Νύχια", /\bnails?\b/i, 0],
+    ["Κρυολογήματα / ανοσοποιητικό", /\b(colds?|flu|immun\w+|infection\w*|getting sick)\b/i, 0], ["Αντοχή / αναπνοή", /\b(endurance|stamina|cardio|breath\w*|vo2\s?max|running)\b/i, 0],
+    ["Δύναμη / μύες", /\b(strength|muscle\w*|gains|lifts?|hypertroph\w+)\b/i, 0], ["Αποκατάσταση / πιάσιμο", /\b(recover\w*|soreness|doms)\b/i, 0],
+    ["Καρδιά / πίεση", /\b(heart rate|palpitation\w*|blood pressure|hypertension|cardiovascular)\b/i, 0], ["Βάρος / όρεξη", /\b(weight|appetite|craving\w*|calorie\w*)\b/i, 0],
+    ["Λίμπιντο", /\b(libido|sex drive|testosterone)\b/i, 0], ["Ζωηρά όνειρα", /\b(vivid dreams?|dreams?|nightmares?)\b/i, 1], ["Αρθρώσεις", /\b(joints?|knees?|arthritis|osteoarthritis)\b/i, 0],
+    ["Πόνος", /\bpain\w*\b/i, 0], ["Σάκχαρο", /\b(blood sugar|glucose|insulin|glycemic|diabet\w+)\b/i, 0], ["Χοληστερίνη / τριγλυκερίδια", /\b(cholesterol|triglycerid\w+|ldl|lipid\w*)\b/i, 0],
+    ["Στερητικά / ευερεθιστότητα", /\b(withdrawal\w*|irritab\w+)\b/i, 1], ["Γεύση / όσφρηση", /\b(taste|smell)\b/i, 0], ["Μακροζωία / θνησιμότητα", /\b(mortality|longevity|lifespan|death)\b/i, 0],
+    ["Οστά", /\b(bones?|fractures?|osteopor\w+|bone mineral density)\b/i, 0]];
+  const POS = /\b(help\w*|improv\w*|better|great|amazing|less|fewer|reduc\w*|gone|works?|worked|noticeabl\w*|game.?changer|life.?changing|fixed|cured)\b/gi;
+  const NEG = /\b(worse|side.?effects?|stopped taking|nothing|no difference|didn'?t (help|work|notice)|bad|terrible|made me)\b/gi;
+  function tallyKeys(texts){
+    const agg = {};
+    for(const t of texts) for(const [lbl, rx] of OUTCOMES){
+      const m = rx.exec(t); if(!m) continue;
+      const w = t.slice(Math.max(0, m.index - 80), m.index + m[0].length + 80);
+      const p = (w.match(POS)||[]).length, n = (w.match(NEG)||[]).length;
+      const a = agg[lbl] ||= [0,0,0]; a[0]++; if(p>n) a[1]++; else if(n>p) a[2]++;
+    }
+    return agg;
+  }
+  function combine(per){
+    const side = Object.fromEntries(OUTCOMES.map(o => [o[0], !!o[2]])), tot = {};
+    for(const [src, d] of Object.entries(per)) for(const [lbl, [c,p,n]] of Object.entries(d.k||{})){
+      const t = tot[lbl] ||= [0,0,0,{}]; t[0]+=c; t[1]+=p; t[2]+=n; t[3][src] = (t[3][src]||0) + c;
+    }
+    return Object.entries(tot).map(([l,[c,p,n,by]]) => [l,c,p,n,side[l],by]).filter(r => r[1] >= 2).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  }
+  const strip = h => { const d = document.createElement("div"); d.innerHTML = String(h||"").replace(/<[^>]+>/g," "); return d.textContent.replace(/\s+/g," ").trim(); };
+  const getJSON = async (url, ms=12000) => { const c = new AbortController(); const t = setTimeout(()=>c.abort(), ms); try{ const r = await fetch(url, {signal:c.signal}); if(!r.ok) throw new Error(r.status); return await r.json(); } finally{ clearTimeout(t); } };
+
+  async function translate(q){   // Greek term -> English medical term via Wikipedia's language links
+    if(!/[α-ωάέήίόύώϊϋΐΰ]/i.test(q)) return {en:q, via:""};
+    const u = "https://el.wikipedia.org/w/api.php?" + new URLSearchParams({action:"query", format:"json", origin:"*", generator:"search", gsrsearch:q, gsrlimit:"3", prop:"langlinks|pageprops", lllang:"en", redirects:"1"});
+    const j = await getJSON(u);
+    const pages = Object.values(j.query?.pages||{}).sort((a,b)=>a.index-b.index).filter(p => !("disambiguation" in (p.pageprops||{})));
+    const pg = pages.find(p => p.langlinks?.length);
+    return pg ? {en: pg.langlinks[0]["*"], via: pg.title} : {en:"", via:""};
+  }
+  const STUDY = '(meta-analysis[pt] OR systematic review[pt] OR randomized controlled trial[pt]) NOT (animals[mh] NOT humans[mh])';
+  async function livePubmed(term){
+    const base = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/";
+    const s = await getJSON(base + "esearch.fcgi?" + new URLSearchParams({db:"pubmed", retmode:"json", retmax:"20", sort:"relevance", tool:"vitamin-compass", term:`(${term}) AND ${STUDY}`}));
+    const ids = s.esearchresult?.idlist || []; if(!ids.length) return [];
+    const j = await getJSON(base + "esummary.fcgi?" + new URLSearchParams({db:"pubmed", retmode:"json", tool:"vitamin-compass", id:ids.join(",")}));
+    const out = ids.map(id => { const d = j.result?.[id] || {}; const pt = (d.pubtype||[]).map(x=>x.toLowerCase());
+      const type = pt.includes("meta-analysis") ? "Μετα-ανάλυση" : pt.includes("systematic review") ? "Συστηματική ανασκόπηση" : pt.includes("randomized controlled trial") ? "RCT" : "Μελέτη";
+      return [id, (d.title||"").replace(/\.$/,""), (d.pubdate||"").slice(0,4), d.source||"", type, 0, d.authors?.[0]?.name||""]; });
+    try{
+      const q = "(" + ids.map(i=>"EXT_ID:"+i).join(" OR ") + ") AND SRC:MED";
+      const c = await getJSON("https://www.ebi.ac.uk/europepmc/webservices/rest/search?" + new URLSearchParams({query:q, format:"json", resultType:"lite", pageSize:"100"}));
+      const m = Object.fromEntries((c.resultList?.result||[]).map(x => [x.pmid, +x.citedByCount||0]));
+      out.forEach(r => r[5] = m[r[0]] || 0);
+    }catch{}
+    const rank = {"Μετα-ανάλυση":0, "Συστηματική ανασκόπηση":1, "RCT":2};
+    return out.sort((a,b) => (rank[a[4]]??3) - (rank[b[4]]??3) || b[5]-a[5]).slice(0,15);
+  }
+  const SE_SITES = {i:["fitness","medicalsciences"], s:["medicalsciences","fitness"], h:["fitness","medicalsciences"], f:["cooking","fitness"]};
+  const LIVE_SOURCES = {
+    hackernews: async q => (await getJSON("https://hn.algolia.com/api/v1/search?" + new URLSearchParams({query:q, tags:"comment", hitsPerPage:"100"}))).hits.map(h => strip(h.comment_text)),
+    stackexchange: async (q, kind) => { let t = []; for(const site of SE_SITES[kind]||["fitness"]){ const j = await getJSON("https://api.stackexchange.com/2.3/search/advanced?" + new URLSearchParams({order:"desc", sort:"relevance", q, site, filter:"withbody", pagesize:"30"})); t = t.concat((j.items||[]).map(x => strip((x.title||"") + " " + (x.body||"")))); } return t; },
+    lemmy: async q => { const t = []; for(const [typ,key] of [["Comments","comments"],["Posts","posts"]]){ const j = await getJSON("https://lemmy.world/api/v3/search?" + new URLSearchParams({q, type_:typ, sort:"TopAll", limit:"50"})); for(const x of j[key]||[]) t.push(strip(typ==="Comments" ? x.comment?.content : (x.post?.name||"") + " " + (x.post?.body||""))); } return t; }
+  };
+  async function liveSearch(kind, q, en, onStep){
+    const forumQ = {s: en + " supplement", i: en, h: en, f: en}[kind] || en;
+    const term = kind === "s" ? `"${en}"[tiab] AND (supplement*[tiab] OR vitamin*[tiab] OR diet*[tiab] OR lifestyle[tiab] OR exercise[tiab])` : `"${en}"[tiab]`;
+    const fsrc = {}, err = [];
+    const tasks = [livePubmed(term).then(ps => (onStep("PubMed", ps.length), ps)).catch(e => (err.push("PubMed"), []))];
+    for(const [src, fn] of Object.entries(LIVE_SOURCES))
+      tasks.push(fn(forumQ, kind).then(t => { t = t.filter(x => x.length >= 25); fsrc[src] = {n:t.length, k:tallyKeys(t)}; onStep(src, t.length); }).catch(() => err.push(src)));
+    const [ps] = await Promise.all(tasks);
+    const titles = Object.fromEntries(Object.entries(tallyKeys(ps.map(p=>p[1]))).map(([l,[c]]) => [l,c]));
+    const auto = {upd:new Date().toISOString().slice(0,10), ps, lit:Object.entries(titles).filter(x=>x[1]>=2).sort((a,b)=>b[1]-a[1]).slice(0,8), fsrc, fn:Object.values(fsrc).reduce((s,d)=>s+d.n,0), fc:combine(fsrc), pq:term};
+    if(err.length) auto.err = err;
+    const id = "live-" + norm(en).replace(/[^a-z0-9 ]/g,"").trim().replace(/ +/g,"-").slice(0,50);
+    const e = {t:kind, id, n:q.charAt(0).toUpperCase()+q.slice(1), en, k:[q, en], cat:"Ζωντανή αναζήτηση", src:"live", auto,
+      sum:"Αποτελέσματα που βρέθηκαν μόλις τώρα στις πηγές. Δεν έχουν ελεγχθεί από άνθρωπο.", b:[], u:[], s:[], f:[], v:[]};
+    if(kind === "s"){ e.doctor = true; e.alert = "Αυτόματη αναζήτηση χωρίς ιατρικό έλεγχο. Οι μελέτες και τα σχόλια μπορεί να αφορούν παρόμοια αλλά διαφορετική πάθηση. Μην ξεκινήσετε συμπλήρωμα χωρίς τον γιατρό σας."; }
+    const size = JSON.stringify(e).length * 2;
+    await tx("live", "readwrite", st => st.put({k:kind+"/"+id, at:Date.now(), size, d:e}));
+    extra.set(kind+"/"+id, e); refreshLists();
+    return e;
+  }
+  async function loadLive(){
+    const all = (await tx("live", "readonly", st => st.getAll())) || [];
+    for(const o of all) extra.set(o.k, o.d);
+    if(all.length) refreshLists();
+  }
+  const canLive = () => !window.claude && location.protocol.startsWith("http");
 
   /* ---------- not found: server discovery or Claude enrichment ---------- */
   function viewChoose(q, rows){
@@ -406,9 +531,13 @@ footer p{margin:0}
   function viewMissing(types, q, partial){
     const kind = types[0] === "g" ? "h" : types[0];
     const latin = /[a-z]/i.test(q) ? q : "";
-    const canServer = MODE === "server", canAI = !!sample;
+    const canServer = MODE === "server", canAI = !!sample, live = canLive();
     $("#result").innerHTML = `<div class="result-head"><div><div class="eyebrow">Νέα αναζήτηση</div><h2>«${esc(q)}»</h2><p class="sub">Δεν υπάρχει ακόμη στη βάση.</p></div></div>
       <div class="panes" style="grid-template-columns:1fr"><article class="pane"><div class="pane-b">
+        ${live ? `<div class="ai-box" id="liveBox"><b>Ζωντανή αναζήτηση στις πηγές</b>
+          <span id="liveTerm" class="r-n">Μετάφραση του όρου…</span>
+          <div class="live-steps" id="liveSteps"></div>
+          <div class="live-edit" id="liveEdit" hidden><label for="enLive" class="r-n">Όρος στα αγγλικά</label><input id="enLive" placeholder="π.χ. sickle cell disease"><button class="btn" id="liveGo" type="button">Αναζήτηση</button></div></div>` : ""}
         ${partial?.length ? `<div class="alert"><b>Δεν βρέθηκε ακριβώς «${esc(q)}».</b> Τα παρακάτω μοιάζουν, αλλά μπορεί να είναι <b>διαφορετική κατάσταση με διαφορετικές οδηγίες</b>. Ανοίξτε τα μόνο αν είστε σίγουροι ότι σας αφορούν.</div>` + rankList(partial.map(r => `${link(r[0], r[1], r[2])}<div class="r-n">${esc(TYPE_LABEL[r[0]])}</div>`)) : ""}
         ${canServer ? `<div class="ai-box"><b>Αυτόματη άντληση από PubMed, Europe PMC και σχόλια χρηστών</b>
           <span>Ο server αναζητά μελέτες και εμπειρίες, μετρά πόσο επαναλαμβάνεται κάθε αποτέλεσμα και προσθέτει την καταχώριση στη βάση για όλους.</span>
@@ -416,11 +545,11 @@ footer p{margin:0}
           <div><button class="btn" id="discGo" type="button">Άντληση δεδομένων</button></div><div class="ai-status" id="discSt"></div></div>` : ""}
         ${canAI ? `<div class="ai-box"><b>Εμπλουτισμός με Claude</b><span>Το Claude συντάσσει καταχώριση με την ίδια δομή και αποθηκεύεται. Οι μελέτες σημειώνονται για επαλήθευση.</span>
           <div><button class="btn" id="aiGo" type="button">Πρόσθεσε το «${esc(q)}»</button></div><div class="ai-status" id="aiSt"></div></div>` : ""}
-        ${!canServer && REPO ? `<div class="ai-box"><b>Ζήτησε προσθήκη στη βάση</b>
+        ${!canServer && REPO && !live ? `<div class="ai-box"><b>Ζήτησε προσθήκη στη βάση</b>
           <span>Ανοίγει μια φόρμα στο GitHub (χρειάζεται λογαριασμός). Μόλις την υποβάλετε, η αυτόματη άντληση από PubMed, Europe PMC και Reddit τρέχει μόνη της και η καταχώριση εμφανίζεται εδώ σε λίγα λεπτά.</span>
           <label for="enTerm2" class="r-n">Ο όρος στα αγγλικά (για PubMed)</label><input id="enTerm2" value="${esc(latin)}" placeholder="π.χ. intermittent fasting">
           <div><a class="btn" id="reqGo" href="#" target="_blank" rel="noopener" style="text-decoration:none;display:inline-block">Άνοιγμα φόρμας</a></div></div>` : ""}
-        ${!canServer && !canAI && !REPO ? `<p class="r-n">Ο εμπλουτισμός χρειάζεται τον server της εφαρμογής ή το Claude.</p>` : ""}
+        ${!canServer && !canAI && !REPO && !live ? `<p class="r-n">Ο εμπλουτισμός χρειάζεται τον server της εφαρμογής ή το Claude.</p>` : ""}
         ${sec("Ή ψάξτε απευθείας")}<div class="shop"><a href="${pubmed(q)}" target="_blank" rel="noopener">PubMed</a><a href="${scholar(q)}" target="_blank" rel="noopener">Google Scholar</a><a href="${reddit(q)}" target="_blank" rel="noopener">Reddit</a></div>
       </div></article></div>`;
     if(canServer) $("#discGo").onclick = async () => {
@@ -432,7 +561,26 @@ footer p{margin:0}
       }catch(err){ st.textContent = String(err.message || err); b.disabled = false; }
     };
     if(canAI) $("#aiGo").onclick = () => enrich(kind, q);
-    if(!canServer && REPO){
+    if(live){
+      const steps = $("#liveSteps"), SRC = {PubMed:"PubMed", hackernews:"Hacker News", stackexchange:"Stack Exchange", lemmy:"Lemmy"};
+      const run = async en => {
+        $("#liveEdit").hidden = true; steps.innerHTML = Object.values(SRC).map(n => `<span class="chip" data-src="${n}">${n} …</span>`).join("");
+        $("#liveTerm").innerHTML = `Αναζήτηση ως <b>${esc(en)}</b> · <button type="button" class="vlink" id="liveChange">αλλαγή όρου</button>`;
+        $("#liveChange").onclick = () => { $("#liveEdit").hidden = false; $("#enLive").value = en; $("#enLive").focus(); };
+        try{
+          const e = await liveSearch(kind, q, en, (src, n) => { const c = steps.querySelector(`[data-src="${SRC[src]||src}"]`); if(c) c.textContent = `${SRC[src]||src} ✓ ${n}`; });
+          if(!e.auto.ps.length && !e.auto.fn){ $("#liveTerm").innerHTML = `Δεν βρέθηκαν αποτελέσματα για <b>${esc(en)}</b>. Δοκιμάστε άλλον όρο στα αγγλικά.`; $("#liveEdit").hidden = false; return; }
+          go(e.t, e.id);
+        }catch{ $("#liveTerm").textContent = "Η ζωντανή αναζήτηση απέτυχε. Ελέγξτε τη σύνδεση."; $("#liveEdit").hidden = false; }
+      };
+      $("#liveGo").onclick = () => { const v = $("#enLive").value.trim(); if(/^[A-Za-z0-9 \-+'.,]{2,80}$/.test(v)) run(v); };
+      (async () => {
+        try{ const {en, via} = await translate(q); if(en){ run(en); if(via) $("#liveTerm").insertAdjacentHTML("beforeend", ` <span class="r-n">(Wikipedia: ${esc(via)})</span>`); }
+          else { $("#liveTerm").textContent = "Δεν βρέθηκε αυτόματα ο αγγλικός όρος. Γράψτε τον παρακάτω:"; $("#liveEdit").hidden = false; } }
+        catch{ $("#liveTerm").textContent = "Γράψτε τον όρο στα αγγλικά:"; $("#liveEdit").hidden = false; }
+      })();
+    }
+    if(!canServer && REPO && !live){
       const upd = () => { const body = `kind: ${kind}\nq: ${q}\nen: ${$("#enTerm2").value.trim()}\n\n(Μην αλλάξετε τις παραπάνω γραμμές. Το kind: i=συμπλήρωμα, s=πρόβλημα, h=συνήθεια, f=τροφή.)`;
         $("#reqGo").href = `https://github.com/${REPO}/issues/new?title=${encodeURIComponent("Προσθήκη: " + q)}&body=${encodeURIComponent(body)}`; };
       upd(); $("#enTerm2").addEventListener("input", upd);
@@ -502,12 +650,29 @@ footer p{margin:0}
     const j = await r.json(); INDEX = j.e; refreshLists(); return j;
   }
 
+  async function showUsage(){
+    const {total, n} = await storeUsage();
+    $("#stUse").textContent = `Αποθηκευμένα στη συσκευή: ${n} καταχωρίσεις · ${(total/1048576).toFixed(1)} MB`;
+  }
+  $("#stCap").innerHTML = CAPS.map(c => `<option value="${c}" ${c===capMB?"selected":""}>${c} MB</option>`).join("");
+  $("#stCap").onchange = () => { capMB = +$("#stCap").value; try{ localStorage.setItem(CAP_KEY, capMB); }catch{} trimStore().then(showUsage); };
+  let clearArm = 0;
+  $("#stClear").onclick = async () => {
+    if(Date.now() - clearArm > 4000){ clearArm = Date.now(); $("#stClear").textContent = "Πατήστε ξανά για επιβεβαίωση"; return; }
+    await tx("entries","readwrite",st=>st.clear()); await tx("live","readwrite",st=>st.clear());
+    [...extra.keys()].filter(k=>extra.get(k).src==="live").forEach(k=>extra.delete(k)); memo.clear(); refreshLists();
+    $("#stClear").textContent = "Διαγράφηκαν"; showUsage();
+  };
+  if(navigator.storage?.persist) navigator.storage.persist().catch(()=>{});
+
   (async () => {
     try{ await loadIndex(); }
     catch{ $("#result").innerHTML = `<p class="loading">Η βάση δεν φόρτωσε. Ελέγξτε τη σύνδεση και ανανεώστε.</p>`; return; }
     try{ const h = await fetch("api/health", {cache:"no-store"}); if(h.ok && (await h.json()).mode === "server") MODE = "server"; }catch{}
-    if(MODE === "server" && "serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js").catch(()=>{}); }
+    if(canLive() && "serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js").catch(()=>{}); }
+    await loadLive();
     if(location.hash) route(false); else show("i", "mg", false);
+    showUsage();
   })();
 
   if(window.claude?.use){
