@@ -814,7 +814,21 @@ footer p{margin:0}
             .filter((r, i, a) => a.findIndex(x => x[0] === r[0] && x[1] === r[1]) === i).slice(0, 6);
       if(!items.length){ close(); return; }
       box.innerHTML = items.map((r, i) => `<button type="button" role="option" data-i="${i}"><span>${esc(r[2])}</span>${types.length > 1 ? `<small>${esc(TYPE_LABEL[r[0]])}</small>` : ""}</button>`).join("");
-      box.hidden = false;
+      box.hidden = false; fit();
+    });
+    // Keep the list inside the part of the screen the keyboard leaves visible
+    function fit(){
+      if(box.hidden) return;
+      const vv = window.visualViewport, bottom = vv ? vv.offsetTop + vv.height : innerHeight;
+      const avail = bottom - input.getBoundingClientRect().bottom - 14;
+      box.style.maxHeight = Math.max(96, Math.min(340, avail)) + "px";
+    }
+    window.visualViewport?.addEventListener("resize", fit);
+    window.visualViewport?.addEventListener("scroll", fit);
+    // On phones, bring the field near the top so list and keyboard do not overlap
+    input.addEventListener("focus", () => {
+      if(!matchMedia("(pointer: coarse)").matches) return;
+      setTimeout(() => { const y = f.getBoundingClientRect().top + scrollY - 8; scrollTo({top: Math.max(0, y), behavior: "smooth"}); setTimeout(fit, 350); }, 300);
     });
     box.addEventListener("pointerdown", ev => ev.preventDefault());   // keep focus so the click lands
     box.addEventListener("click", ev => { const b = ev.target.closest("button"); if(b) pick(items[+b.dataset.i]); });
