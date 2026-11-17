@@ -344,8 +344,13 @@ footer p{margin:0}
       <div class="links"><a href="${pubmed(query)}" target="_blank" rel="noopener">PubMed</a><a href="${scholar(query)}" target="_blank" rel="noopener">Google Scholar</a></div></div>`;
   }
   function autoStudies(a){
-    if(!a?.ps?.length) return "";
-    return sec(`Αυτόματα από PubMed · ${esc(a.upd||"")}`) + a.ps.slice(0,10).map(p => {
+    let out = "";
+    if(a?.ps?.length) out += sec(`Ισχυρότερες μελέτες από PubMed · ${esc(a.upd||"")}`) + studyRows(a.ps.slice(0,10));
+    if(a?.po?.length) out += sec("Άλλες μελέτες (μικρότερη τεκμηρίωση)") + `<p class="r-n">Παρατηρητικές, μικρές μελέτες, ανασκοπήσεις και αναφορές περιστατικών. Δείχνουν πιθανές συσχετίσεις, όχι απόδειξη.</p>` + studyRows(a.po.slice(0,10));
+    return out;
+  }
+  function studyRows(rows){
+    return rows.map(p => {
       const [pmid,title,yr,jr,type,cites,au] = p;
       return `<div class="study"><div class="meta"><span class="type">${esc(type)}</span><span>${esc(au)}${au?", ":""}${esc(yr)}</span><span>${esc(jr)}</span>${cites?`<span>${cites} αναφορές</span>`:""}</div>
         <div class="finding">${esc(title)}</div><div class="links"><a href="https://pubmed.ncbi.nlm.nih.gov/${encodeURIComponent(pmid)}/" target="_blank" rel="noopener">PMID ${esc(pmid)}</a></div></div>`;
@@ -407,7 +412,7 @@ footer p{margin:0}
       if(e.w) p3 += `<div class="warn"><b>Προσοχή:</b> ${esc(e.w)}</div>`;
       p3count = `${(e.f||[]).length} βήματα`;
     }
-    return head(e) + `<div class="panes">${pane(1, e.t==="i"?"Πού θα ωφεληθώ":"Οφέλη", `${(e.b||[]).length+(e.u||[]).length} σημεία`, p1)}${pane(2, "Επίσημες μελέτες", `${studies.length + (e.auto?.ps?.length||0)} μελέτες`, p2)}${pane(3, p3title, p3count, p3)}</div>`;
+    return head(e) + `<div class="panes">${pane(1, e.t==="i"?"Πού θα ωφεληθώ":"Οφέλη", `${(e.b||[]).length+(e.u||[]).length} σημεία`, p1)}${pane(2, "Επίσημες μελέτες", `${studies.length + (e.auto?.ps?.length||0)+(e.auto?.po?.length||0)} μελέτες`, p2)}${pane(3, p3title, p3count, p3)}</div>`;
   }
 
   function viewSymptom(e){
@@ -441,7 +446,7 @@ footer p{margin:0}
     p3 += `<div class="warn"><b>Προσοχή:</b> ${e.doctor ? "Πάθηση που χρειάζεται ιατρική παρακολούθηση. Κάθε συμπλήρωμα μόνο με έγκριση του θεράποντα γιατρού." : "Αν το σύμπτωμα επιμένει, κάντε πρώτα εξετάσεις. Πολλά οφέλη ισχύουν μόνο όταν υπάρχει έλλειψη."}</div>`;
     return head(Object.assign({sum:"Βιταμίνες, τροφές και συνήθειες που μπορεί να βοηθήσουν, με σειρά τεκμηρίωσης. Πατήστε ένα όνομα για λεπτομέρειες."}, e)) +
       (e.alert ? `<div class="alert big" role="note"><b>${e.doctor ? "Ιατρική πάθηση" : "Σημαντικό"}:</b> ${esc(e.alert)}</div>` : "") +
-      `<div class="panes">${pane(1,"Τι μπορεί να βοηθήσει",`${ev.length+(e.u||[]).length} σημεία`,p1)}${pane(2,"Επίσημες μελέτες",`${st.length+(e.auto?.ps?.length||0)} μελέτες`,p2)}${pane(3,"Διατροφή, συμπληρώματα & ζωή","",p3)}</div>`;
+      `<div class="panes">${pane(1,"Τι μπορεί να βοηθήσει",`${ev.length+(e.u||[]).length} σημεία`,p1)}${pane(2,"Επίσημες μελέτες",`${st.length+(e.auto?.ps?.length||0)+(e.auto?.po?.length||0)} μελέτες`,p2)}${pane(3,"Διατροφή, συμπληρώματα & ζωή","",p3)}</div>`;
   }
 
   function viewGoal(e){
@@ -457,7 +462,7 @@ footer p{margin:0}
     let p3 = sec("Πρώτα βήματα") + forms(top, "step");
     if(e.x?.length) p3 += sec("Συμπληρώματα, αν χρειάζεται") + rankList(e.x.map(([id,why]) => `<span class="kind k-i">Συμπλήρωμα</span>${link("i",id,nm("i",id))}${why?`<div class="r-n">${esc(why)}</div>`:""}`));
     return head(Object.assign({sum:"Αλλαγές στον τρόπο ζωής και στη διατροφή που βοηθούν, με σειρά τεκμηρίωσης."}, e)) +
-      `<div class="panes">${pane(1,"Τι βοηθά",`${(e.v||[]).length+(e.fd||[]).length} επιλογές`,p1)}${pane(2,"Επίσημες μελέτες",`${st.length+(e.auto?.ps?.length||0)} μελέτες`,p2)}${pane(3,"Πώς να ξεκινήσω","",p3)}</div>`;
+      `<div class="panes">${pane(1,"Τι βοηθά",`${(e.v||[]).length+(e.fd||[]).length} επιλογές`,p1)}${pane(2,"Επίσημες μελέτες",`${st.length+(e.auto?.ps?.length||0)+(e.auto?.po?.length||0)} μελέτες`,p2)}${pane(3,"Πώς να ξεκινήσω","",p3)}</div>`;
   }
 
   function viewFaq(e){
@@ -553,13 +558,14 @@ footer p{margin:0}
     return {en:"", via:"", guess:false};
   }
   const STUDY = '(meta-analysis[pt] OR systematic review[pt] OR randomized controlled trial[pt] OR clinical trial[pt]) NOT (animals[mh] NOT humans[mh])';
-  async function livePubmed(term){
+  const OTHER = "NOT (animals[mh] NOT humans[mh]) NOT (comment[pt] OR editorial[pt] OR letter[pt]) NOT (meta-analysis[pt] OR systematic review[pt] OR randomized controlled trial[pt] OR clinical trial[pt])";
+  async function livePubmed(term, strong=true){
     const base = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/";
-    const s = await getJSON(base + "esearch.fcgi?" + new URLSearchParams({db:"pubmed", retmode:"json", retmax:"20", sort:"relevance", tool:"vitamin-compass", term:`(${term}) AND ${STUDY}`}));
+    const s = await getJSON(base + "esearch.fcgi?" + new URLSearchParams({db:"pubmed", retmode:"json", retmax:strong?"20":"10", sort:"relevance", tool:"vitamin-compass", term: strong ? `(${term}) AND ${STUDY}` : `(${term}) ${OTHER}`}));
     const ids = s.esearchresult?.idlist || []; if(!ids.length) return [];
     const j = await getJSON(base + "esummary.fcgi?" + new URLSearchParams({db:"pubmed", retmode:"json", tool:"vitamin-compass", id:ids.join(",")}));
     const out = ids.map(id => { const d = j.result?.[id] || {}; const pt = (d.pubtype||[]).map(x=>x.toLowerCase());
-      const type = pt.includes("meta-analysis") ? "Μετα-ανάλυση" : pt.includes("systematic review") ? "Συστηματική ανασκόπηση" : pt.includes("randomized controlled trial") ? "RCT" : pt.includes("clinical trial") ? "Κλινική μελέτη" : "Μελέτη";
+      const type = pt.includes("meta-analysis") ? "Μετα-ανάλυση" : pt.includes("systematic review") ? "Συστηματική ανασκόπηση" : pt.includes("randomized controlled trial") ? "RCT" : pt.includes("clinical trial") ? "Κλινική μελέτη" : pt.includes("observational study") ? "Παρατηρητική μελέτη" : pt.includes("review") ? "Ανασκόπηση" : pt.includes("case reports") ? "Αναφορά περιστατικού" : "Μελέτη";
       return [id, (d.title||"").replace(/\.$/,""), (d.pubdate||"").slice(0,4), d.source||"", type, 0, d.authors?.[0]?.name||""]; });
     try{
       const q = "(" + ids.map(i=>"EXT_ID:"+i).join(" OR ") + ") AND SRC:MED";
@@ -583,9 +589,10 @@ footer p{margin:0}
     const tasks = [livePubmed(term).then(ps => (onStep("PubMed", ps.length), ps)).catch(e => (err.push("PubMed"), []))];
     for(const [src, fn] of Object.entries(LIVE_SOURCES))
       tasks.push(fn(forumQ, kind).then(t => { t = t.filter(x => x.length >= 25); fsrc[src] = {n:t.length, k:tallyKeys(t)}; onStep(src, t.length); }).catch(() => err.push(src)));
+    let po = []; tasks.push(livePubmed(term, false).then(x => { po = x; }).catch(() => {}));
     const [ps] = await Promise.all(tasks);
     const titles = Object.fromEntries(Object.entries(tallyKeys(ps.map(p=>p[1]))).map(([l,[c]]) => [l,c]));
-    const auto = {upd:new Date().toISOString().slice(0,10), ps, lit:Object.entries(titles).filter(x=>x[1]>=2).sort((a,b)=>b[1]-a[1]).slice(0,8), fsrc, fn:Object.values(fsrc).reduce((s,d)=>s+d.n,0), fc:combine(fsrc), pq:term};
+    const auto = {upd:new Date().toISOString().slice(0,10), ps, po, lit:Object.entries(titles).filter(x=>x[1]>=2).sort((a,b)=>b[1]-a[1]).slice(0,8), fsrc, fn:Object.values(fsrc).reduce((s,d)=>s+d.n,0), fc:combine(fsrc), pq:term};
     if(err.length) auto.err = err;
     const id = "live-" + norm(en).replace(/[^a-z0-9 ]/g,"").trim().replace(/ +/g,"-").slice(0,50);
     const e = {t:kind, id, n:q.charAt(0).toUpperCase()+q.slice(1), en, k:[q, en], cat:"Ζωντανή αναζήτηση", src:"live", auto,
@@ -663,7 +670,7 @@ footer p{margin:0}
         $("#liveChange").onclick = () => { $("#liveEdit").hidden = false; $("#enLive").value = en; $("#enLive").focus(); };
         try{
           const e = await liveSearch(kind, q, en, (src, n) => { const c = steps.querySelector(`[data-src="${SRC[src]||src}"]`); if(c) c.textContent = `${SRC[src]||src} ✓ ${n}`; });
-          if(!e.auto.ps.length && !e.auto.fn){ liveDone(); $("#liveTerm").innerHTML = `Δεν βρέθηκαν αποτελέσματα για <b>${esc(en)}</b>. Δοκιμάστε άλλον όρο στα αγγλικά.`; $("#liveEdit").hidden = false; return; }
+          if(!e.auto.ps.length && !e.auto.po.length && !e.auto.fn){ liveDone(); $("#liveTerm").innerHTML = `Δεν βρέθηκαν αποτελέσματα για <b>${esc(en)}</b>. Δοκιμάστε άλλον όρο στα αγγλικά.`; $("#liveEdit").hidden = false; return; }
           if(e.auto.ps.length >= 3 || e.auto.fn >= 20) shareLive(e, viaName).then(r => { if(r?.queued){ e.shared = true; const tg = document.querySelector(".result-head .tags"); if(tg && location.hash === `#${e.t}-${e.id}`) tg.insertAdjacentHTML("beforeend", `<span class="tag auto">Προστίθεται στην κοινή βάση</span>`); } });
           go(e.t, e.id);
         }catch{ liveDone(); $("#liveTerm").textContent = "Η αναζήτηση απέτυχε. Ελέγξτε τη σύνδεση."; $("#liveEdit").hidden = false; }

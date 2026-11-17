@@ -59,6 +59,14 @@ def harvest_one(t, id_, ents):
         auto["lit"] = [[r[0], r[1]] for r in lexicon.tally([s["title"] for s in studies]) if r[1] >= 2][:8]
         auto["pq"] = term
 
+    # 1b) other studies (observational, small, reviews): weaker evidence, shown separately
+    try:
+        others = sources.pubmed_search(term, retmax=12, strong=False)
+        auto["po"] = [[s["pmid"], s["title"], s["year"], s["journal"], s["type"], 0, s["author"]] for s in others[:10]]
+    except sources.SourceError as err:
+        auto["err"].append(str(err))
+        auto["po"] = prev.get("po", [])
+
     # 2) user experiences: count how often each effect repeats, per source
     per = dict(prev.get("fsrc") or {})
     for src, fn in FORUM_SOURCES:

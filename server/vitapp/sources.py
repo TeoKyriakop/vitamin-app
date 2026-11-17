@@ -83,9 +83,13 @@ def _eparams(**kw):
     return urllib.parse.urlencode(kw)
 
 
-def pubmed_search(term, retmax=20):
-    """Return a list of study dicts for a PubMed query, best evidence types only."""
-    q = f"({term}) AND {STUDY_FILTER}"
+OTHER_FILTER = "NOT (animals[mh] NOT humans[mh]) NOT (comment[pt] OR editorial[pt] OR letter[pt])"
+
+
+def pubmed_search(term, retmax=20, strong=True):
+    """Return a list of study dicts for a PubMed query: the strongest study types (strong=True)
+    or any other human study (observational, small studies, reviews, case reports)."""
+    q = f"({term}) AND {STUDY_FILTER}" if strong else f"({term}) {OTHER_FILTER} NOT ({STUDY_FILTER.split(' NOT ')[0]})"
     ids = _get(EUTILS + "esearch.fcgi?" + _eparams(db="pubmed", term=q, retmax=retmax, sort="relevance"))
     ids = ids.get("esearchresult", {}).get("idlist", [])
     if not ids:
@@ -108,6 +112,12 @@ def parse_esummary(summ):
             kind = "RCT"
         elif "clinical trial" in pts:
             kind = "Κλινική μελέτη"
+        elif "observational study" in pts:
+            kind = "Παρατηρητική μελέτη"
+        elif "review" in pts:
+            kind = "Ανασκόπηση"
+        elif "case reports" in pts:
+            kind = "Αναφορά περιστατικού"
         else:
             kind = "Μελέτη"
         authors = d.get("authors") or []
