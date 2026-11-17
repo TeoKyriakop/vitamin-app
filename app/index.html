@@ -709,8 +709,9 @@ footer p{margin:0}
     try{ const h = await fetch("api/health", {cache:"no-store"}); if(h.ok && (await h.json()).mode === "server") MODE = "server"; }catch{}
     if(canLive() && "serviceWorker" in navigator){ navigator.serviceWorker.register("sw.js").catch(()=>{}); }
     await loadLive();
-    if(location.hash) route(false);
-    else { document.querySelectorAll("form.capsule input").forEach(i => i.value = ""); $("#result").innerHTML = ""; }
+    // Always open on an empty search page, even if the browser restores the last viewed entry (#...)
+    if(location.hash) history.replaceState(null, "", location.pathname + location.search);
+    document.querySelectorAll("form.capsule input").forEach(i => i.value = ""); $("#result").innerHTML = "";
     showUsage();
   })();
 

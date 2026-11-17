@@ -9,9 +9,6 @@ on:
         description: "Ανανέωση όλων των καταχωρίσεων (όχι μόνο των παλιών)"
         type: boolean
         default: false
-  push:
-    branches: [main]
-    paths: ["app/**", "server/**", ".github/workflows/**"]
   issues:
     types: [opened]
 
@@ -24,6 +21,7 @@ permissions:
 concurrency:
   group: harvest
   cancel-in-progress: false
+# Η δημοσίευση γίνεται από το deploy.yml (και αμέσως μετά από κάθε αλλαγή κώδικα)
 
 jobs:
   harvest:
@@ -31,9 +29,6 @@ jobs:
     if: github.event_name != 'issues' || startsWith(github.event.issue.title, 'Προσθήκη:')
     runs-on: ubuntu-latest
     timeout-minutes: 300
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
     env:
       NCBI_API_KEY: ${{ secrets.NCBI_API_KEY }}
       NCBI_EMAIL: ${{ secrets.NCBI_EMAIL }}
@@ -65,11 +60,6 @@ jobs:
           ISSUE_BODY: ${{ github.event.issue.body }}
         run: python -m vitapp.discover_issue | tee ../issue-result.txt
 
-      - name: Δημιουργία δεδομένων (μετά από αλλαγή κώδικα)
-        if: github.event_name == 'push'
-        working-directory: server
-        run: python -m vitapp.harvest --build
-
       - name: Αποθήκευση νέων δεδομένων στο repository
         run: |
           git config user.name "vitamin-bot"
@@ -90,13 +80,6 @@ jobs:
           gh issue comment "$ISSUE" --body-file issue-result.txt
           gh issue close "$ISSUE"
 
-      - name: Δημιουργία ιστοσελίδας
-        working-directory: server
-        run: python -m vitapp.site ../site
-
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
-      - uses: actions/deploy-pages@v4
-        id: deploy
+  deploy:
+    needs: harvest
+    uses: ./.github/workflows/deploy.yml
