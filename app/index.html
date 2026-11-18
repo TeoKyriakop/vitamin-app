@@ -868,6 +868,7 @@ footer p{margin:0}
     window.visualViewport?.addEventListener("scroll", fit);
     // On phones, bring the field near the top so list and keyboard do not overlap
     input.addEventListener("focus", () => {
+      input.value = ""; close();   // start each new search with an empty field
       if(!matchMedia("(pointer: coarse)").matches) return;
       setTimeout(() => { const y = f.getBoundingClientRect().top + scrollY - 8; scrollTo({top: Math.max(0, y), behavior: "smooth"}); setTimeout(fit, 350); }, 300);
     });
