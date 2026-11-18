@@ -13,7 +13,7 @@ VIER ARTEN ZU SUCHEN
 • Vitamin oder Nahrungsergänzung: wobei es helfen kann, welche Formen es gibt, welche Lebensmittel es enthalten.
 • Gesundheitsproblem: welche Vitamine, Lebensmittel und Gewohnheiten helfen können und was Sie meiden sollten.
 • Lebensstil & Ernährung: z. B. „mehr Ausdauer“ → Bewegung, Rauchstopp, Schlaf, Rote-Bete-Saft.
-• Fragen: Antworten auf 200 häufige Fragen, z. B. „Wann nimmt man Vitamin D am besten?“.
+• Fragen: Antworten auf 240 häufige Fragen, z. B. „Wann nimmt man Vitamin D am besten?“.
 
 DREI ANSICHTEN DER ERGEBNISSE
 • Nutzen: zuerst aus Studien mit Evidenzgrad (A stark, B mittel, C schwach), dann wie oft jede Wirkung in Kommentaren von Nutzern genannt wird.
@@ -26,7 +26,7 @@ SICHERHEIT ZUERST
 • Bei ernsten Erkrankungen werden keine Dosen vorgeschlagen, nur Themen für das Gespräch mit Ihrem Arzt.
 
 IMMER AKTUELL
-• Über 800 geprüfte Einträge: 200 Präparate, 200 Erkrankungen, 200 Gewohnheiten und Lebensmittel, 200 Fragen.
+• Über 900 geprüfte Einträge: 220 Präparate, 240 Erkrankungen, 200 Gewohnheiten und Lebensmittel, 240 Fragen.
 • Täglich aktualisiert mit neuen Studien und Kommentaren.
 • Suchen Sie nach allem: Fehlt etwas, durchsucht die App die Quellen live und fügt es für alle der gemeinsamen Datenbank hinzu.
 

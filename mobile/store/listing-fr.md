@@ -13,7 +13,7 @@ QUATRE FAÇONS DE CHERCHER
 • Vitamine ou complément : à quoi il peut servir, quelles formes existent, quels aliments en contiennent.
 • Problème de santé : quelles vitamines, quels aliments et quelles habitudes peuvent aider, et ce qu'il faut éviter.
 • Mode de vie & alimentation : ex. « plus d'endurance » → exercice, arrêt du tabac, sommeil, jus de betterave.
-• Demander : réponses à 200 questions fréquentes, ex. « Quand prendre la vitamine D ? ».
+• Demander : réponses à 240 questions fréquentes, ex. « Quand prendre la vitamine D ? ».
 
 TROIS VUES DES RÉSULTATS
 • Bienfaits : d'abord ceux des études avec un niveau de preuve (A fort, B moyen, C faible), puis la fréquence de chaque effet dans les commentaires des utilisateurs.
@@ -26,7 +26,7 @@ LA SÉCURITÉ D'ABORD
 • Pour les maladies graves, aucune dose n'est proposée, seulement des sujets à aborder avec votre médecin.
 
 TOUJOURS À JOUR
-• Plus de 800 fiches vérifiées : 200 compléments, 200 problèmes de santé, 200 habitudes et aliments, 200 questions.
+• Plus de 900 fiches vérifiées : 220 compléments, 240 problèmes de santé, 200 habitudes et aliments, 240 questions.
 • Mise à jour quotidienne avec de nouvelles études et de nouveaux commentaires.
 • Cherchez ce que vous voulez : s'il manque quelque chose, l'application interroge les sources en direct et l'ajoute à la base commune pour tous.
 

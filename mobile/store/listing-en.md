@@ -13,7 +13,7 @@ FOUR WAYS TO SEARCH
 • Vitamin or supplement: where it may help, which forms exist, which foods contain it.
 • Health problem: which vitamins, foods and habits may help, and what to avoid.
 • Lifestyle and diet: e.g. "more stamina" → exercise, quitting smoking, sleep, beetroot juice.
-• Ask: answers to 200 common questions, e.g. "When is the best time to take vitamin D?".
+• Ask: answers to 240 common questions, e.g. "When is the best time to take vitamin D?".
 
 THREE RESULT VIEWS
 • Benefits: first from studies with an evidence grade (A strong, B moderate, C weak), then how often each effect is repeated in user comments.
@@ -26,7 +26,7 @@ SAFETY FIRST
 • For serious conditions no doses are suggested, only topics to discuss with your doctor.
 
 ALWAYS UP TO DATE
-• Over 800 curated entries: 200 supplements, 200 health conditions, 200 habits and foods, 200 questions.
+• Over 900 curated entries: 220 supplements, 240 health conditions, 200 habits and foods, 240 questions.
 • Updated daily with new studies and comments.
 • Search for anything: if something is missing, the app searches the sources live and adds it to the shared database for everyone.
 
