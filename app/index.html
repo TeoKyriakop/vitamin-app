@@ -142,7 +142,8 @@ footer p{margin:0}
 
 @media (max-width:1180px){.search-row{grid-template-columns:1fr 1fr}}
 @media (max-width:1060px){.panes{grid-template-columns:1fr 1fr}.pane.p3{grid-column:1/-1}}
-@media (max-width:720px){.search-row,.panes{grid-template-columns:1fr}.brand h1{font-size:1.45rem}.result-head h2{font-size:1.4rem}}
+.panes.faq-panes{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
+@media (max-width:720px){.search-row,.panes,.panes.faq-panes{grid-template-columns:1fr}.brand h1{font-size:1.45rem}.result-head h2{font-size:1.4rem}}
 @media (prefers-reduced-motion:no-preference){.pane{animation:rise .3s ease both}.pane.p2{animation-delay:.04s}.pane.p3{animation-delay:.08s}
 @keyframes rise{from{transform:translateY(6px)}to{transform:none}}}
 </style>
@@ -245,6 +246,7 @@ footer p{margin:0}
     new MutationObserver(ms => { for(const m of ms){ if(m.type === "characterData") { const v = trText(m.target.nodeValue); if(v !== m.target.nodeValue) m.target.nodeValue = v; } else m.addedNodes.forEach(n => n.nodeType === 3 ? (n.nodeValue = trText(n.nodeValue)) : trTree(n)); } })
       .observe(document.body, {childList:true, subtree:true, characterData:true});
   }
+  if(LANG !== "el") document.querySelectorAll('a[href="privacy.html"]').forEach(a => a.href = `privacy-${LANG}.html`);
   document.getElementById("langBtn").textContent = LANG === "el" ? "EN" : "ΕΛ";
   document.getElementById("langBtn").onclick = () => { try{ localStorage.setItem("vc:lang", LANG === "el" ? "en" : "el"); }catch{} location.reload(); };
 
@@ -515,7 +517,7 @@ footer p{margin:0}
     const refs = (e.refs||[]).map(([t,id,n]) => `<a class="chip" href="#${t}-${esc(id)}">${esc(n)} <small>${esc(TYPE_LABEL[t])}</small></a>`).join("");
     const more = faqSearch(e.n + " " + (e.k||[]).join(" "), 7).filter(x => x.r[1] !== e.id).slice(0,5).map(x => x.r);
     return `<div class="result-head"><div><div class="eyebrow">Συχνή ερώτηση</div><h2>${esc(e.n)}</h2></div><div class="tags">${e.g?`<span class="tag"><span class="grade g-${esc(e.g)}">${esc(e.g)}</span>τεκμηρίωση</span>`:""}</div></div>
-      <div class="panes" style="grid-template-columns:minmax(0,2fr) minmax(0,1fr)">
+      <div class="panes faq-panes">
         ${pane(1, "Απάντηση", "", `<p class="answer">${esc(e.a)}</p>${refs?sec("Δείτε αναλυτικά")+`<div class="chips">${refs}</div>`:""}<div class="legend"><a href="${pubmed((e.k||[])[0]||e.n)}" target="_blank" rel="noopener">Μελέτες στο PubMed</a></div>`)}
         ${pane(2, "Σχετικές ερωτήσεις", "", more.length ? faqList(more) : `<p class="r-n">—</p>`)}
       </div>`;

@@ -159,6 +159,7 @@ window.VC_I18N.en = {
     [/^Εμπλουτισμός Claude · (.+)$/, "Added by Claude · $1"],
     [/^Όλα για «(.+)» ›$/, "Everything about “$1” ›"],
     [/^(\d+) συμπληρώματα · (\d+) παθήσεις · (\d+) τρόπος ζωής & διατροφή · (\d+) ερωτήσεις$/, "$1 supplements · $2 conditions · $3 lifestyle & diet · $4 questions"],
+    [/^Αποθηκευμένα στη συσκευή: 1 καταχωρίσεις · ([\d.]+) MB$/, "Saved on this device: 1 entry · $1 MB"],
     [/^Αποθηκευμένα στη συσκευή: (\d+) καταχωρίσεις · ([\d.]+) MB$/, "Saved on this device: $1 entries · $2 MB"],
     [/^Αποθηκευμένα στη συσκευή: …$/, "Saved on this device: …"],
     [/^Ο όρος «(.+)» ταιριάζει σε διαφορετικές καταστάσεις με διαφορετικές οδηγίες\.$/, "The term “$1” matches different conditions with different advice."],
