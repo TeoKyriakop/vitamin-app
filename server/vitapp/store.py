@@ -44,7 +44,37 @@ def read_json(path, default=None):
         return default
 
 
-def load_entities(include_content=True):
+LANGS = ["el", "en"]          # el is the source language; others are overlays in server/i18n/<lang>.json
+TEXT_FIELDS = ("n", "k", "cat", "sum", "b", "u", "f", "fd", "w", "alert", "avoid", "diff", "lifex", "a", "s")
+
+
+def apply_lang(ents, lang):
+    """Overlay translated text fields onto the Greek entries. Untranslated entries keep the
+    Greek text but take their English name, and are marked so the app can say so."""
+    if lang == "el":
+        return ents
+    tr = read_json(ROOT / "i18n" / f"{lang}.json", {}) or {}
+    out = {}
+    for key, e in ents.items():
+        e = dict(e)
+        t = tr.get(f"{key[0]}/{key[1]}")
+        if t:
+            for f, v in t.items():
+                if f in ("why_v", "why_u", "why_x", "why_fd"):      # short notes inside link lists
+                    lst = {"why_v": "v", "why_u": "u", "why_x": "x", "why_fd": "fd"}[f]
+                    col = 2 if lst in ("v", "fd") and key[0] in ("s", "g") else 1
+                    e[lst] = [list(x[:col]) + [v[i] if i < len(v) else x[col]] + list(x[col + 1:]) for i, x in enumerate(e.get(lst, []))]
+                else:
+                    e[f] = v
+        else:
+            e["untranslated"] = True
+            if e.get("en"):
+                e["n"] = e["en"]
+        out[key] = e
+    return out
+
+
+def load_entities(include_content=True, lang="el"):
     """All entries keyed by (type, id): curated seed files + entries discovered from searches.
     Types: i supplement, s condition, h habit, g goal, f food, q frequent question."""
     v = read_json(SEED / "vitamins.json")
@@ -66,7 +96,7 @@ def load_entities(include_content=True):
         r = read_json(p)
         if r:
             ents.setdefault((r["t"], r["id"]), dict(r))
-    return ents
+    return apply_lang(ents, lang)
 
 
 def auto_path(t, id_):
@@ -170,8 +200,16 @@ def build_entry(t, id_, ents):
 
 
 def build_all():
-    ents = load_entities()
-    out = APP / "data"
+    """Writes app/data (Greek) and app/data/<lang>/ for every other language."""
+    total = 0
+    for lang in LANGS:
+        total = _build_lang(lang)
+    return total
+
+
+def _build_lang(lang):
+    ents = load_entities(lang=lang)
+    out = APP / "data" if lang == "el" else APP / "data" / lang
     index = []
     keep = set()
     for (t, id_), e in sorted(ents.items()):
@@ -182,5 +220,5 @@ def build_all():
     for p in (out / "e").glob("*/*.json"):
         if p not in keep:
             p.unlink()
-    write_json(out / "index.json", {"v": time.strftime("%Y-%m-%d %H:%M"), "e": index})
+    write_json(out / "index.json", {"v": time.strftime("%Y-%m-%d %H:%M"), "lang": lang, "e": index})
     return len(index)
