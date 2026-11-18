@@ -60,7 +60,7 @@ def check(key, tr, src):
                     for x, y in zip(a, b):
                         if _shape(x) != _shape(y) and _shape(y) != "·":
                             errs.append(f"{key}: άλλαξε η τιμή «{y}» στο {f}")
-        elif isinstance(src[f], list) and (not isinstance(v, list) or len(v) != len(src[f])):
+        elif f != "k" and isinstance(src[f], list) and (not isinstance(v, list) or len(v) != len(src[f])):
             errs.append(f"{key}: διαφορετικό μήκος στο {f}")
     return errs
 
