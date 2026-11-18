@@ -75,8 +75,10 @@ def main():
     if cmd == "export":
         a, n = int(sys.argv[3]), int(sys.argv[4])
         todo = [k for k in keys if f"{k[0]}/{k[1]}" not in done][a:a + n]
-        for k in todo:
-            print(json.dumps({"key": f"{k[0]}/{k[1]}", **greek(ents[k], k[0])}, ensure_ascii=False, separators=(",", ":")))
+        src = store.read_json(store.ROOT / "i18n" / f"{sys.argv[5]}.json", {}) if len(sys.argv) > 5 else {}
+        for k in todo:        # optional 5th argument: export from an existing translation (e.g. en) instead of Greek
+            key = f"{k[0]}/{k[1]}"
+            print(json.dumps({"key": key, **(src.get(key) or greek(ents[k], k[0]))}, ensure_ascii=False, separators=(",", ":")))
     elif cmd == "merge":
         errs, added = [], 0
         for line in open(sys.argv[3], encoding="utf-8"):

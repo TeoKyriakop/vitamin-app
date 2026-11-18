@@ -44,7 +44,7 @@ def read_json(path, default=None):
         return default
 
 
-LANGS = ["el", "en"]          # el is the source language; others are overlays in server/i18n/<lang>.json
+LANGS = ["el", "en", "de", "fr"]          # el is the source language; others are overlays in server/i18n/<lang>.json
 TEXT_FIELDS = ("n", "k", "cat", "sum", "b", "u", "f", "fd", "w", "alert", "avoid", "diff", "lifex", "a", "s")
 
 
@@ -54,6 +54,9 @@ def apply_lang(ents, lang):
     if lang == "el":
         return ents
     tr = read_json(ROOT / "i18n" / f"{lang}.json", {}) or {}
+    if lang != "en":            # not yet translated -> English text, which more readers understand than Greek
+        base = read_json(ROOT / "i18n" / "en.json", {}) or {}
+        tr = {k: tr.get(k) or base.get(k) for k in set(base) | set(tr)}
     out = {}
     for key, e in ents.items():
         e = dict(e)
