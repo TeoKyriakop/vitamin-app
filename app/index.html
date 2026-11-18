@@ -377,7 +377,7 @@ footer p{margin:0}
   const rankList = (rows, empty) => rows.length ? `<ol class="rank">${rows.map((h,i)=>`<li><span class="pos">${i+1}</span><div>${h}</div></li>`).join("")}</ol>` : `<p class="r-n">${empty||"Δεν υπάρχουν ακόμη δεδομένα."}</p>`;
   const graded = (g, main, note) => `<span class="grade g-${esc(g)}">${esc(g)}</span>${main}${note?`<div class="r-n">${esc(note)}</div>`:""}`;
   const byGrade = arr => arr.slice().sort((a,b)=>(GRADE[b[1]]||0)-(GRADE[a[1]]||0));
-  const rankOf = t => /μετα-ανάλυση|cochrane|συστηματική|ομπρέλα/i.test(t[3]+t[2]) ? 0 : /^rct/i.test(t[3]) ? 1 : 2;
+  const rankOf = t => /μετα-ανάλυση|cochrane|συστηματική|ομπρέλα|meta-analysis|systematic|umbrella/i.test(t[3]+t[2]) ? 0 : /^rct/i.test(t[3]) ? 1 : 2;
   const sortStudies = arr => arr.slice().sort((a,b) => rankOf(a)-rankOf(b) || (+b[1]||0)-(+a[1]||0));
 
   function studyCard(s, verify){

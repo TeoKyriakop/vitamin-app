@@ -8,7 +8,8 @@ A translation line is {"key": "t/id", ...translated fields}. Fields per type:
   i: n k cat sum b u f fd w s     s: n k alert avoid diff lifex why_v why_u s     h: n k cat sum b u f w s
   f: n k sum b u f w s            g: n k why_v why_u why_x why_fd                q: n k a
 The checker refuses a line if ids, grades, numbers or list lengths differ from the Greek."""
-import json, re, sys
+import json
+import re, sys
 from . import store
 
 FIELDS = {"i": "n k cat sum b u f fd w s", "s": "n k alert avoid diff lifex why_v why_u s", "h": "n k cat sum b u f w s",
@@ -70,7 +71,7 @@ def main():
     path = store.ROOT / "i18n" / f"{lang}.json"
     done = store.read_json(path, {}) or {}
     ents = store.load_entities()
-    keys = [k for k in sorted(ents) if not ents[k]["id"].startswith("d-")]
+    keys = [k for k in sorted(ents) if not re.fullmatch(r"d-.+-[0-9a-f]{6}", ents[k]["id"])]  # χωρίς τις αυτόματες καταχωρίσεις
     if cmd == "export":
         a, n = int(sys.argv[3]), int(sys.argv[4])
         todo = [k for k in keys if f"{k[0]}/{k[1]}" not in done][a:a + n]
