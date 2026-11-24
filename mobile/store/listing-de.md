@@ -45,4 +45,4 @@ https://teokyriakop.github.io/vitamin-app/privacy-de.html
 ## Grafiken
 - Symbol 512×512: icon-512.png
 - Vorstellungsgrafik 1024×500: de/feature-graphic.png
-- Smartphone-Screenshots 1080×2160: de/1-search.png … de/6-question.png
+- Smartphone-Screenshots 1080×1920 (9:16): de/1-search.png … de/6-question.png

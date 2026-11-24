@@ -45,4 +45,4 @@ https://teokyriakop.github.io/vitamin-app/privacy.html
 ## Υλικό
 - Εικονίδιο 512×512: icon-512.png
 - Εικόνα προβολής 1024×500: feature-graphic.png
-- Στιγμιότυπα τηλεφώνου 1080×2160: 1-search.png … 6-question.png
+- Στιγμιότυπα τηλεφώνου 1080×1920 (9:16): 1-search.png … 6-question.png

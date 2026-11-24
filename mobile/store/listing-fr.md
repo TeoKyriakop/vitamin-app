@@ -45,4 +45,4 @@ https://teokyriakop.github.io/vitamin-app/privacy-fr.html
 ## Visuels
 - Icône 512×512 : icon-512.png
 - Image de présentation 1024×500 : fr/feature-graphic.png
-- Captures d'écran téléphone 1080×2160 : fr/1-search.png … fr/6-question.png
+- Captures d'écran téléphone 1080×1920 (9:16) : fr/1-search.png … fr/6-question.png
